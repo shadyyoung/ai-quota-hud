@@ -25,7 +25,7 @@
 ## 快速开始
 
 ```bash
-git clone https://github.com/OWNER/ai-quota-hud.git
+git clone https://github.com/shadyyoung/ai-quota-hud.git
 cd ai-quota-hud
 ./build.sh          # 编译
 ./install.sh        # 安装到 ~/Applications 并设置开机自启

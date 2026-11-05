@@ -3,7 +3,7 @@ import Foundation
 /// 从 GitHub Releases 检查新版本
 enum Updater {
     /// 发布时替换成实际的 GitHub 仓库
-    static let repo = "OWNER/ai-quota-hud"
+    static let repo = "shadyyoung/ai-quota-hud"
 
     static var latestTag: String? {
         get { UserDefaults.standard.string(forKey: "update.latestTag") }

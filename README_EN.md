@@ -25,7 +25,7 @@ Written in native Swift + AppKit. ~460 KB, no Electron, no third-party dependenc
 ## Quick start
 
 ```bash
-git clone https://github.com/OWNER/ai-quota-hud.git
+git clone https://github.com/shadyyoung/ai-quota-hud.git
 cd ai-quota-hud
 ./build.sh          # build
 ./install.sh        # install to ~/Applications + launch at login
