@@ -6,6 +6,13 @@
   <img src="docs/screenshot.png" width="420" alt="AI Quota HUD">
 </p>
 
+<p align="center">
+  <a href="https://github.com/shadyyoung/ai-quota-hud/releases/latest"><img src="https://img.shields.io/github/v/release/shadyyoung/ai-quota-hud?style=flat-square" alt="Release"></a>
+  <a href="https://github.com/shadyyoung/ai-quota-hud/actions"><img src="https://img.shields.io/github/actions/workflow/status/shadyyoung/ai-quota-hud/build.yml?style=flat-square" alt="Build"></a>
+  <img src="https://img.shields.io/badge/platform-macOS%2013%2B-blue?style=flat-square" alt="Platform">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
+</p>
+
 Written in native Swift + AppKit. ~460 KB, no Electron, no third-party dependencies.
 
 ## Features
@@ -23,6 +30,14 @@ Written in native Swift + AppKit. ~460 KB, no Electron, no third-party dependenc
 | ![](docs/screenshot.png) | ![](docs/compact.png) |
 
 ## Quick start
+
+### Option 1: download
+
+Grab `AIQuotaHUD-v*-macOS.zip` from [Releases](https://github.com/shadyyoung/ai-quota-hud/releases/latest), unzip, and drag `AIQuotaHUD.app` into `~/Applications`.
+
+If macOS says the developer cannot be verified, right-click → Open.
+
+### Option 2: build from source
 
 ```bash
 git clone https://github.com/shadyyoung/ai-quota-hud.git

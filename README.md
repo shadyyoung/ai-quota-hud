@@ -6,6 +6,13 @@
   <img src="docs/screenshot.png" width="420" alt="AI 额度悬浮窗">
 </p>
 
+<p align="center">
+  <a href="https://github.com/shadyyoung/ai-quota-hud/releases/latest"><img src="https://img.shields.io/github/v/release/shadyyoung/ai-quota-hud?style=flat-square" alt="Release"></a>
+  <a href="https://github.com/shadyyoung/ai-quota-hud/actions"><img src="https://img.shields.io/github/actions/workflow/status/shadyyoung/ai-quota-hud/build.yml?style=flat-square" alt="Build"></a>
+  <img src="https://img.shields.io/badge/platform-macOS%2013%2B-blue?style=flat-square" alt="Platform">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
+</p>
+
 原生 Swift + AppKit 编写，约 460 KB，不依赖 Electron 或任何第三方库。
 
 ## 特性
@@ -23,6 +30,14 @@
 | ![](docs/screenshot.png) | ![](docs/compact.png) |
 
 ## 快速开始
+
+### 方式一：直接下载（推荐）
+
+去 [Releases](https://github.com/shadyyoung/ai-quota-hud/releases/latest) 下载 `AIQuotaHUD-v*-macOS.zip`，解压后把 `AIQuotaHUD.app` 拖进 `~/Applications`。
+
+首次打开如果提示「无法验证开发者」，右键 → 打开。
+
+### 方式二：从源码构建
 
 ```bash
 git clone https://github.com/shadyyoung/ai-quota-hud.git
