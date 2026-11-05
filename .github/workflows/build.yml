@@ -1,0 +1,56 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          swiftc --version
+          xcode-select -p
+
+      - name: Build app
+        run: ./build.sh
+
+      - name: Verify bundle
+        run: |
+          set -e
+          BIN=build/AIQuotaHUD.app/Contents/MacOS/AIQuotaHUD
+          ICON=build/AIQuotaHUD.app/Contents/Resources/AppIcon.icns
+          test -x "$BIN" || { echo "missing executable"; exit 1; }
+          test -f "$ICON" || { echo "missing icon"; exit 1; }
+          file "$BIN"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' \
+            build/AIQuotaHUD.app/Contents/Info.plist
+          echo "Bundle OK"
+
+      - name: Package
+        run: |
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
+            build/AIQuotaHUD.app/Contents/Info.plist)
+          ditto -c -k --keepParent build/AIQuotaHUD.app "build/AIQuotaHUD-v${VERSION}-macOS.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AIQuotaHUD-app
+          path: build/AIQuotaHUD-v*-macOS.zip
+          retention-days: 14
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/AIQuotaHUD-v*-macOS.zip
+          generate_release_notes: true
