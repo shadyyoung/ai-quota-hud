@@ -1,0 +1,15 @@
+# 构建产物
+build/
+*.iconset/
+*.icns
+
+# 系统
+.DS_Store
+._*
+
+# 日志
+*.log
+
+# 本地个人配置（不要提交任何凭证）
+*.env
+providers.local.json
