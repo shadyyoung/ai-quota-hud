@@ -1,0 +1,62 @@
+name: Build Windows
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'windows/**'
+      - '.github/workflows/windows.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'windows/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: windows
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Show environment
+        run: |
+          node --version
+          npm --version
+          Get-ComputerInfo -Property OsName,OsVersion | Format-List
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Syntax check
+        run: |
+          node --check electron/main.js
+          node --check electron/preload.js
+          node --check electron/providers/index.js
+          node --check renderer/renderer.js
+          Write-Host "syntax OK"
+
+      - name: Build installer
+        run: npm run build
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: List output
+        run: Get-ChildItem dist | Format-Table Name,Length
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AIQuotaHUD-windows
+          path: |
+            windows/dist/*.exe
+            windows/dist/*.zip
+          retention-days: 14
+          if-no-files-found: warn

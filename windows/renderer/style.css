@@ -1,0 +1,252 @@
+/* ============================================================
+   AI 额度悬浮窗 —— Windows 渲染层
+   复刻 macOS 版的 Liquid Glass：顶部冷光、内壁高光、大圆角
+   ============================================================ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  font-family: "Microsoft YaHei UI", "Segoe UI", system-ui, sans-serif;
+  color: #f2f4f8;
+}
+
+#card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 20px;
+  overflow: hidden;
+  opacity: var(--alpha, 1);
+  transition: opacity 0.18s ease-out, border-radius 0.18s ease-out;
+  /* 玻璃本体 */
+  background: linear-gradient(
+    180deg,
+    rgba(30, 34, 46, 0.74) 0%,
+    rgba(18, 20, 30, 0.86) 55%,
+    rgba(10, 12, 18, 0.92) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.28),
+    0 10px 28px rgba(0, 0, 0, 0.42);
+}
+
+/* 顶部冷光 + 底部暗角 */
+.glass {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0) 42%),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.10) 0%, rgba(0, 0, 0, 0) 38%);
+}
+
+/* 顶部折射亮边 */
+.glass::before {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 13px;
+  right: 13px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.46);
+  border-radius: 1px;
+  filter: blur(0.3px);
+}
+
+/* 内壁高光描边 */
+.glass::after {
+  content: "";
+  position: absolute;
+  inset: 1.5px;
+  border-radius: 18.5px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+/* ---------------------------------------------------- 内容 */
+
+.content {
+  position: relative;
+  z-index: 2;
+  padding: 14px 16px 12px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  transition: opacity 0.16s ease-out;
+}
+
+body.collapsed .content {
+  opacity: 0;
+  pointer-events: none;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 18px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  padding-bottom: 6px;
+}
+
+.title {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.62);
+  letter-spacing: 0.2px;
+}
+
+.time {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+  font-variant-numeric: tabular-nums;
+}
+
+#rows {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.empty {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  padding-left: 21px;
+}
+
+/* ---------------------------------------------------- 单行 */
+
+.row {
+  display: grid;
+  grid-template-columns: 15px 1fr auto;
+  column-gap: 6px;
+  align-items: center;
+  padding: 5px 0;
+}
+
+.row .icon {
+  width: 15px;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.row .icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.row .name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #f4f6fa;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row .name.dim {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.row .value {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.row .value .prefix {
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.55);
+  margin-right: 2px;
+}
+
+.row .value.warn { color: #ff6b6b; }
+.row .value.low  { color: #fbbf45; }
+.row .value.dim  { color: rgba(255, 255, 255, 0.38); }
+
+/* 第二行：进度条 + 副标题 */
+.row .sub {
+  grid-column: 2 / 4;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.bar {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+.secondary {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.52);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------------------------------------------------- 收起态 */
+
+.dots {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  z-index: 3;
+}
+
+body.collapsed .dots {
+  display: flex;
+}
+
+body.collapsed #card {
+  border-radius: 5px;
+}
+
+.dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+}
+
+.dot.blue   { background: #4d8dff; }
+.dot.purple { background: #a874ff; }
+.dot.teal   { background: #3fd1c3; }
+.dot.indigo { background: #8b9bff; }
+.dot.orange { background: #ff9f45; }
+.dot.gray   { background: rgba(255, 255, 255, 0.42); }
+
+/* 默认（未指定 accent） */
+.dot.default { background: rgba(255, 255, 255, 0.42); }

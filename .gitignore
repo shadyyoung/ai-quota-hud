@@ -13,3 +13,8 @@ build/
 # 本地个人配置（不要提交任何凭证）
 *.env
 providers.local.json
+
+# Windows 版
+windows/node_modules/
+windows/dist/
+windows/*.log

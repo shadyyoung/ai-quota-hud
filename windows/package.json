@@ -1,0 +1,53 @@
+{
+  "name": "ai-quota-hud",
+  "version": "1.0.0",
+  "description": "Desktop widget showing remaining quota for AI services (Windows)",
+  "main": "electron/main.js",
+  "author": "shadyyoung",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.5.0"
+  },
+  "build": {
+    "appId": "com.shadyyoung.aiquotahud",
+    "productName": "AI Quota HUD",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "AI Quota HUD"
+    }
+  }
+}

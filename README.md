@@ -54,6 +54,15 @@ cd ai-quota-hud
 - **⌥⌘A** 强制展开 5 秒
 - **右键**卡片：刷新 / 设置 / 手动校准 / 开机自启 / 退出
 
+## 平台版本
+
+| 平台 | 实现 | 状态 |
+|---|---|---|
+| **macOS** | 原生 Swift + AppKit | ✅ 本仓库根目录 |
+| **Windows** | Electron | ✅ `windows/` 子目录 |
+
+Windows 版使用 [Electron](https://www.electronjs.org/) 实现（安装包约 100MB），功能与 macOS 版对齐：透明置顶、点击穿透、悬停展开、托盘菜单、Ctrl+Alt+A 热键。详见 [windows/README.md](windows/README.md)。
+
 ## 支持哪些服务
 
 | 服务 | 数据来源 | 状态 |
