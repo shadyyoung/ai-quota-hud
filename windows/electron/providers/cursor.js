@@ -93,7 +93,7 @@ module.exports = {
     };
 
     if (!Database) {
-      return { ...base, primary: '--', secondary: '需要 SQLite 模块', status: 'unavailable' };
+      return { ...base, primary: '--', secondary: 'Windows 版暂不支持读取（需 SQLite）', status: 'unavailable' };
     }
 
     const token = readToken();

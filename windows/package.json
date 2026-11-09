@@ -8,15 +8,11 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win",
-    "postinstall": "electron-builder install-app-deps"
+    "build": "electron-builder --win"
   },
   "devDependencies": {
     "electron": "^33.0.0",
     "electron-builder": "^25.1.8"
-  },
-  "dependencies": {
-    "better-sqlite3": "^11.5.0"
   },
   "build": {
     "appId": "com.shadyyoung.aiquotahud",
