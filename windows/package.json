@@ -23,7 +23,8 @@
     "files": [
       "electron/**/*",
       "renderer/**/*",
-      "package.json"
+      "package.json",
+      "node_modules/**/*"
     ],
     "win": {
       "target": [
@@ -35,6 +36,12 @@
         }
       ],
       "icon": "build/icon.png"
-    }
+    },
+    "asarUnpack": [
+      "node_modules/sql.js/dist/**"
+    ]
+  },
+  "dependencies": {
+    "sql.js": "^1.13.0"
   }
 }

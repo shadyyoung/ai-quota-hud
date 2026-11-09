@@ -48,6 +48,16 @@ jobs:
           node --check renderer/renderer.js
           Write-Host "syntax OK"
 
+      - name: Smoke test sql.js
+        run: |
+          node -e "const init=require('sql.js'); init({locateFile:f=>require.resolve('sql.js/dist/'+f)}).then(SQL=>{const db=new SQL.Database(); db.run('create table t(a)'); db.run('insert into t values (1)'); const r=db.exec('select a from t'); if(r[0].values[0][0]!==1) throw new Error('unexpected'); console.log('sql.js OK')})"
+
+      - name: Verify wasm is unpacked
+        run: |
+          if (-not (Test-Path "node_modules/sql.js/dist/sql-wasm.wasm")) { throw "missing sql-wasm.wasm" }
+          Write-Host "wasm present"
+        shell: pwsh
+
       - name: Build installer
         run: npm run build
 

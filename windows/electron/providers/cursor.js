@@ -5,38 +5,33 @@
  *  读 %APPDATA%\Cursor\User\globalStorage\state.vscdb（SQLite）
  *  取 cursorAuth/accessToken，请求 api2.cursor.sh/auth/usage
  *
- *  better-sqlite3 是原生模块，加载失败时优雅降级为「不可用」。
+ *  用纯 WASM 的 sql.js 读数据库，不需要原生编译。
  */
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { net } = require('electron');
-
-let Database = null;
-try {
-  Database = require('better-sqlite3');
-} catch (e) {
-  console.error('[cursor] better-sqlite3 不可用:', e.message);
-}
+const sqlite = require('./sqlite');
 
 function dbPath() {
   const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
   return path.join(appData, 'Cursor', 'User', 'globalStorage', 'state.vscdb');
 }
 
-function readToken() {
-  if (!Database) return null;
+async function readToken() {
   const p = dbPath();
   if (!fs.existsSync(p)) return null;
   try {
-    const db = new Database(p, { readonly: true, fileMustExist: true });
-    const row = db
-      .prepare("select value from ItemTable where key = 'cursorAuth/accessToken' limit 1")
-      .get();
-    db.close();
-    if (!row || !row.value) return null;
-    return Buffer.isBuffer(row.value) ? row.value.toString('utf8') : String(row.value);
+    const rows = await sqlite.query(
+      p,
+      "select value from ItemTable where key = 'cursorAuth/accessToken' limit 1"
+    );
+    if (!rows.length) return null;
+    const v = rows[0].value;
+    if (v == null) return null;
+    if (v instanceof Uint8Array) return Buffer.from(v).toString('utf8');
+    return String(v);
   } catch (e) {
     console.error('[cursor] 读 token 失败:', e.message);
     return null;
@@ -67,16 +62,15 @@ function httpGet(url, headers, timeoutMs = 10000) {
   });
 }
 
-function resetText(iso) {
+function monthResetText(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
-  const ms = d.getTime() - Date.now();
-  if (ms <= 0) return '';
+  const start = new Date(iso);
+  if (isNaN(start.getTime())) return '';
+  const next = new Date(start);
+  next.setMonth(next.getMonth() + 1);
+  const ms = next.getTime() - Date.now();
   const days = Math.floor(ms / 86400000);
-  const hours = Math.floor((ms % 86400000) / 3600000);
-  if (days > 0) return `${days} 天 ${hours} 小时后重置`;
-  return `${hours} 小时后重置`;
+  return days > 0 ? `${days} 天后重置` : '';
 }
 
 module.exports = {
@@ -92,11 +86,11 @@ module.exports = {
       badge: null,
     };
 
-    if (!Database) {
-      return { ...base, primary: '--', secondary: 'Windows 版暂不支持读取（需 SQLite）', status: 'unavailable' };
+    if (!fs.existsSync(dbPath())) {
+      return { ...base, primary: '--', secondary: '未找到 Cursor 数据', status: 'unavailable' };
     }
 
-    const token = readToken();
+    const token = await readToken();
     if (!token) {
       return { ...base, primary: '--', secondary: '未找到 Cursor 登录态', status: 'unavailable' };
     }
@@ -111,16 +105,7 @@ module.exports = {
       const gpt4 = j['gpt-4'] || {};
       const used = Number(gpt4.numRequests) || 0;
       const maxReq = gpt4.maxRequestUsage != null ? Number(gpt4.maxRequestUsage) : null;
-      const start = j.startOfMonth ? new Date(j.startOfMonth) : null;
-
-      let reset = '';
-      if (start && !isNaN(start.getTime())) {
-        const next = new Date(start);
-        next.setMonth(next.getMonth() + 1);
-        const ms = next.getTime() - Date.now();
-        const days = Math.floor(ms / 86400000);
-        if (days > 0) reset = `${days} 天后重置`;
-      }
+      const reset = monthResetText(j.startOfMonth);
 
       if (maxReq && maxReq > 0) {
         const remaining = Math.max(0, Math.min(1, (maxReq - used) / maxReq));
