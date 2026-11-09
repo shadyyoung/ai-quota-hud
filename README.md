@@ -56,12 +56,12 @@ cd ai-quota-hud
 
 ## 平台版本
 
-| 平台 | 实现 | 状态 |
+| 平台 | 实现 | 下载 |
 |---|---|---|
-| **macOS** | 原生 Swift + AppKit | ✅ 本仓库根目录 |
-| **Windows** | Electron | ✅ `windows/` 子目录 |
+| **macOS** | 原生 Swift + AppKit（460 KB） | [AIQuotaHUD-v1.0.0-macOS.zip](https://github.com/shadyyoung/ai-quota-hud/releases/download/v1.0.0/AIQuotaHUD-v1.0.0-macOS.zip) |
+| **Windows** | Electron（106 MB） | [AIQuotaHUD-v1.0.0-windows.zip](https://github.com/shadyyoung/ai-quota-hud/releases/download/v1.0.0/AIQuotaHUD-v1.0.0-windows.zip) |
 
-Windows 版使用 [Electron](https://www.electronjs.org/) 实现（约 106 MB），界面与交互和 macOS 版对齐：透明置顶、点击穿透、悬停展开、托盘菜单、Ctrl+Alt+A 热键、开机自启。
+Windows 版的界面与交互和 macOS 版对齐：透明置顶、点击穿透、悬停展开、托盘菜单、Ctrl+Alt+A 热键、开机自启。
 
 > Windows 版目前**支持 Codex 和自定义数据源**；Cursor / WorkBuddy 因依赖 SQLite 原生模块暂未支持。详见 [windows/README.md](windows/README.md)。
 
