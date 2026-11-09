@@ -18,6 +18,11 @@ jobs:
     defaults:
       run:
         working-directory: windows
+    env:
+      # GitHub Releases 在该 runner 上频繁 504，改用镜像下载 Electron 与打包工具
+      ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+      ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
     steps:
       - uses: actions/checkout@v4
@@ -45,8 +50,6 @@ jobs:
 
       - name: Build installer
         run: npm run build
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: List output
         run: Get-ChildItem dist | Format-Table Name,Length
