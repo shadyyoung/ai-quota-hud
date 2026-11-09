@@ -63,7 +63,7 @@ cd ai-quota-hud
 
 Windows 版的界面与交互和 macOS 版对齐：透明置顶、点击穿透、悬停展开、托盘菜单、Ctrl+Alt+A 热键、开机自启。
 
-> Windows 版目前**支持 Codex 和自定义数据源**；Cursor / WorkBuddy 因依赖 SQLite 原生模块暂未支持。详见 [windows/README.md](windows/README.md)。
+> Windows 版和 macOS 版一样支持 Codex / Cursor / WorkBuddy 与自定义数据源。Cursor 和 WorkBuddy 的 SQLite 数据用纯 WASM 的 [sql.js](https://sql.js.org/) 读取，不需要原生编译。
 
 ## 支持哪些服务
 
