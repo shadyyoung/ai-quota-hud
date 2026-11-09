@@ -15,7 +15,7 @@ const path = require('path');
 const fs = require('fs');
 
 const CARD_WIDTH = 278;
-const CARD_HEIGHT = 210;
+const CARD_HEIGHT = 252;
 const COLLAPSED_HEIGHT = 10;
 const IDLE_ALPHA = 0.18;
 const HOVER_ALPHA = 1.0;
@@ -179,6 +179,63 @@ function updateTray(items) {
   tray.setToolTip(summary || 'AI 额度');
 }
 
+// ---------------------------------------------------------------- 形象（头像）
+
+function builtinAvatarDir() {
+  return path.join(__dirname, '../assets/avatars');
+}
+
+function userAvatarDir() {
+  return path.join(app.getPath('userData'), 'avatars');
+}
+
+function listAvatars() {
+  const out = [];
+  const scan = (dir, prefix) => {
+    if (!fs.existsSync(dir)) return;
+    let files = [];
+    try { files = fs.readdirSync(dir); } catch (_) { return; }
+    for (const f of files) {
+      if (!/\.(png|jpe?g|gif|webp)$/i.test(f)) continue;
+      out.push({
+        id: prefix + ':' + f,
+        name: path.parse(f).name,
+        path: path.join(dir, f),
+      });
+    }
+  };
+  scan(builtinAvatarDir(), 'builtin');
+  scan(userAvatarDir(), 'user');
+  return out;
+}
+
+function currentAvatar() {
+  const list = listAvatars();
+  if (!list.length) return null;
+  const want = loadSettings().avatar;
+  return list.find((a) => a.id === want) || list[0];
+}
+
+function avatarPayload() {
+  const a = currentAvatar();
+  if (!a) return null;
+  let dataUrl = null;
+  try {
+    const buf = fs.readFileSync(a.path);
+    let ext = path.extname(a.path).slice(1).toLowerCase();
+    if (ext === 'jpg') ext = 'jpeg';
+    dataUrl = `data:image/${ext};base64,${buf.toString('base64')}`;
+  } catch (e) {
+    console.error('读取形象失败', e.message);
+  }
+  return {
+    id: a.id,
+    name: a.name,
+    dataUrl,
+    list: listAvatars().map((x) => ({ id: x.id, name: x.name })),
+  };
+}
+
 // ---------------------------------------------------------------- 托盘 / 菜单
 
 let expandedByMenu = false;
@@ -231,6 +288,34 @@ function refreshTrayMenu() {
       click: (item) => {
         app.setLoginItemSettings({ openAtLogin: item.checked });
       },
+    },
+    {
+      label: '形象',
+      submenu: (() => {
+        const list = listAvatars();
+        const cur = currentAvatar();
+        const items = list.map((a) => ({
+          label: a.name,
+          type: 'radio',
+          checked: cur && cur.id === a.id,
+          click: () => {
+            saveSettings({ avatar: a.id });
+            if (win && !win.isDestroyed()) {
+              win.webContents.send('avatar', avatarPayload());
+            }
+          },
+        }));
+        items.push({ type: 'separator' });
+        items.push({
+          label: '把新图片放进形象文件夹…',
+          click: () => {
+            const dir = userAvatarDir();
+            fs.mkdirSync(dir, { recursive: true });
+            shell.openPath(dir);
+          },
+        });
+        return items;
+      })(),
     },
     {
       label: '编辑数据源配置',
@@ -310,6 +395,13 @@ if (!gotLock) {
     scheduleRefresh();
     refresh();
 
+    // 窗口准备好后推头像
+    if (win) {
+      win.webContents.once('did-finish-load', () => {
+        win.webContents.send('avatar', avatarPayload());
+      });
+    }
+
     globalShortcut.register('Control+Alt+A', () => flashCard());
 
     ipcMain.handle('get-items', () => lastItems);
@@ -327,6 +419,7 @@ if (!gotLock) {
       if (tray) tray.popUpContextMenu();
       setTimeout(() => { expandedByMenu = false; }, 800);
     });
+    ipcMain.handle('get-avatar', () => avatarPayload());
     ipcMain.on('drag-start', () => startDrag());
     ipcMain.on('drag-end', () => endDrag());
     ipcMain.handle('quit', () => app.quit());

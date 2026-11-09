@@ -167,6 +167,22 @@ document.addEventListener('dblclick', async () => {
 // 无边框窗口在 Windows 上不会自动可拖，这里手动把鼠标位移转成窗口位移
 let pressing = false;
 
+// ---------------------------------------------------- 形象（头像）
+const avatarEl = document.getElementById('avatar');
+
+function applyAvatar(payload) {
+  if (!payload || !payload.dataUrl) {
+    avatarEl.classList.remove('loaded');
+    avatarEl.removeAttribute('src');
+    return;
+  }
+  avatarEl.src = payload.dataUrl;
+  avatarEl.classList.add('loaded');
+}
+
+window.hud.onAvatar(applyAvatar);
+
+
 document.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return;          // 只处理左键
   pressing = true;
@@ -204,6 +220,11 @@ setInterval(tick, 30000);
   try {
     const items = await window.hud.getItems();
     render(items);
+  } catch (e) {
+    console.error(e);
+  }
+  try {
+    applyAvatar(await window.hud.getAvatar());
   } catch (e) {
     console.error(e);
   }

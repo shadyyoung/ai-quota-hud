@@ -21,6 +21,7 @@
       "output": "dist"
     },
     "files": [
+      "assets/**/*",
       "electron/**/*",
       "renderer/**/*",
       "package.json",
