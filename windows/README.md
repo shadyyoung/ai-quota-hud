@@ -13,8 +13,8 @@ macOS 版的功能移植版，使用 Electron 实现（macOS 版是原生 Swift/
 | 全局快捷键 | ⌥⌘A | **Ctrl+Alt+A** |
 | 开机自启 | LaunchAgent | `app.setLoginItemSettings` |
 | Codex 额度 | ✅ 实时 | ✅ 实时（net 模块自动走系统代理） |
-| Cursor 额度 | ✅ | ✅（需 SQLite 模块） |
-| WorkBuddy 积分 | ✅ 锚点扣减 | ✅ 锚点扣减 |
+| Cursor 额度 | ✅ | ⚠️ 暂不支持（需 SQLite 原生模块） |
+| WorkBuddy 积分 | ✅ 锚点扣减 | ⚠️ 暂不支持（需 SQLite 原生模块） |
 | 自定义数据源 | JSON | JSON（`%APPDATA%\ai-quota-hud\providers.json`） |
 | 托盘菜单 | — | ✅ |
 
@@ -45,7 +45,7 @@ npm run build
 
 ## 已知限制（诚实说明）
 
-1. **Cursor / WorkBuddy 依赖 `better-sqlite3`**（原生模块）。安装时如果编译失败，这两个服务会显示「需要 SQLite 模块」，其余功能不受影响。
+1. **Cursor / WorkBuddy 暂不支持**。它们的数据在 SQLite 里，读取需要 `better-sqlite3` 原生模块；该模块在 GitHub 的 Windows runner 上编译不稳定（node-gyp 找不到 Visual Studio），为了保证构建可复现，已移除。这两项会显示「Windows 版暂不支持读取」，其余功能不受影响。后续可改用纯 JS 的 `sql.js` 补上。
 2. **透明窗口在 Windows 上依赖显卡驱动**。极少数机器可能出现黑底，可用托盘菜单关掉阴影（默认已关）。
 3. **Codex 需要系统代理**。应用使用 Electron 的 `net` 模块，会自动走 Windows 系统代理设置。
 4. **应用未签名**。首次运行时 Windows SmartScreen 会警告，点「更多信息 → 仍要运行」。
