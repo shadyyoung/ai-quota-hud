@@ -56,7 +56,6 @@ jobs:
         with:
           name: AIQuotaHUD-windows
           path: |
-            windows/dist/*.exe
             windows/dist/*.zip
           retention-days: 14
           if-no-files-found: warn
