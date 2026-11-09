@@ -163,6 +163,35 @@ document.addEventListener('dblclick', async () => {
   render(items);
 });
 
+// ---------------------------------------------------- 拖动窗口
+// 无边框窗口在 Windows 上不会自动可拖，这里手动把鼠标位移转成窗口位移
+let pressing = false;
+
+document.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;          // 只处理左键
+  pressing = true;
+  window.hud.dragStart();
+});
+
+document.addEventListener('mouseup', () => {
+  if (!pressing) return;
+  pressing = false;
+  window.hud.dragEnd();
+});
+
+// 鼠标移出窗口后松手可能收不到 mouseup，失焦时兜底
+window.addEventListener('blur', () => {
+  if (pressing) {
+    pressing = false;
+    window.hud.dragEnd();
+  }
+});
+
+// 拖动时给个抓取光标
+window.hud.onDragging((on) => {
+  document.body.style.cursor = on ? 'grabbing' : '';
+});
+
 // 时间
 function tick() {
   timeEl.textContent = fmtTime();

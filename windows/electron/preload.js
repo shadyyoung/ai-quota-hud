@@ -10,6 +10,9 @@ contextBridge.exposeInMainWorld('hud', {
   setMenuOpen: (open) => ipcRenderer.invoke('set-menu-open', open),
   openConfigDir: () => ipcRenderer.invoke('open-config-dir'),
   showMenu: () => ipcRenderer.invoke('show-menu'),
+  dragStart: () => ipcRenderer.send('drag-start'),
+  dragEnd: () => ipcRenderer.send('drag-end'),
+  onDragging: (cb) => ipcRenderer.on('dragging', (_e, v) => cb(v)),
   quit: () => ipcRenderer.invoke('quit'),
 
   onItems: (cb) => ipcRenderer.on('items', (_e, v) => cb(v)),

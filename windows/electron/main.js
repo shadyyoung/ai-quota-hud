@@ -138,6 +138,7 @@ function startPointerTracking() {
   pollTimer = setInterval(() => {
     if (!win || !tracking) return;
     if (expandedByMenu) return;
+    if (dragging) return;     // 正在拖动，别收起窗口
 
     const p = screen.getCursorScreenPoint();
     const b = win.getBounds();
@@ -181,6 +182,8 @@ function updateTray(items) {
 // ---------------------------------------------------------------- 托盘 / 菜单
 
 let expandedByMenu = false;
+let dragging = null;      // { dx, dy } 拖动时光标相对窗口的偏移
+let dragTimer = null;
 
 function buildTray() {
   const iconPath = path.join(__dirname, '../build/tray.png');
@@ -256,6 +259,40 @@ function scheduleRefresh() {
   refreshTimer = setInterval(refresh, sec * 1000);
 }
 
+// ---------------------------------------------------------------- 拖动
+
+function startDrag() {
+  if (!win || dragging) return;
+  const c = screen.getCursorScreenPoint();
+  const [wx, wy] = win.getPosition();
+  dragging = { dx: c.x - wx, dy: c.y - wy };
+  if (dragTimer) clearInterval(dragTimer);
+  dragTimer = setInterval(() => {
+    if (!dragging || !win || win.isDestroyed()) { endDrag(); return; }
+    const p = screen.getCursorScreenPoint();
+    win.setPosition(p.x - dragging.dx, p.y - dragging.dy);
+
+    // 兜底：光标离窗口太远，多半是已经松手但没收到 mouseup
+    const b = win.getBounds();
+    if (p.x < b.x - 500 || p.x > b.x + b.width + 500 ||
+        p.y < b.y - 500 || p.y > b.y + b.height + 500) {
+      endDrag();
+    }
+  }, 16);
+  win.webContents.send('dragging', true);
+}
+
+function endDrag() {
+  if (!dragging) return;
+  dragging = null;
+  if (dragTimer) { clearInterval(dragTimer); dragTimer = null; }
+  if (win && !win.isDestroyed()) {
+    const [x, y] = win.getPosition();
+    saveSettings({ x, y });
+    win.webContents.send('dragging', false);
+  }
+}
+
 // ---------------------------------------------------------------- 生命周期
 
 const gotLock = app.requestSingleInstanceLock();
@@ -290,6 +327,8 @@ if (!gotLock) {
       if (tray) tray.popUpContextMenu();
       setTimeout(() => { expandedByMenu = false; }, 800);
     });
+    ipcMain.on('drag-start', () => startDrag());
+    ipcMain.on('drag-end', () => endDrag());
     ipcMain.handle('quit', () => app.quit());
     ipcMain.handle('open-config-dir', () => {
       shell.openPath(app.getPath('userData'));
