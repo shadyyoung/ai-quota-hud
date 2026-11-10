@@ -114,15 +114,19 @@ for p in 0..<(w * h) where !visited[p] {
     }
 }
 
-// 去白边：从透明区向外迭代腐蚀，吃掉紧贴边缘的白色描边
+// 去白边：从透明区向外迭代腐蚀，只吃"低饱和度的白"，
+// 避免把浅蓝发丝一起啃掉
 var removedMap = visited
-for _ in 0..<3 {
+for round in 0..<30 {
     var toRemove = [Int]()
     for p in 0..<(w * h) where !removedMap[p] {
         let i = p * 4
         let r = Int(pixels[i]), g = Int(pixels[i + 1]), b = Int(pixels[i + 2])
         let mn = min(r, min(g, b))
-        guard mn >= 218 else { continue }          // 只吃浅色
+        let mx = max(r, max(g, b))
+        let sat = mx - mn
+        // 白/近白，且几乎不带颜色
+        guard mn >= 222, sat <= 34 else { continue }
         let x = p % w, y = p / w
         var nearHole = false
         for (nx, ny) in [(x-1,y),(x+1,y),(x,y-1),(x,y+1)] {
@@ -131,12 +135,67 @@ for _ in 0..<3 {
         }
         if nearHole { toRemove.append(p) }
     }
-    if toRemove.isEmpty { break }
+    if toRemove.isEmpty {
+        print("  第 \(round + 1) 轮无白边可去，停止")
+        break
+    }
     for p in toRemove {
         removedMap[p] = true
         pixels[p * 4 + 3] = 0
     }
-    print("  腐蚀一轮，去掉 \(toRemove.count) 像素")
+    if round < 8 || toRemove.count > 200 { print("  第 \(round + 1) 轮：去掉 \(toRemove.count) 像素") }
+}
+
+// 清理发丝缝隙里的残留白块：找所有"近白"连通块，
+// 面积小且位于画面外围的删掉；中心区域（眼睛高光）保留
+do {
+    var label = [Bool](repeating: false, count: w * h)   // 已访
+    var smallRemoved = 0
+    let cx = w / 2, cy = h / 2
+    let centerRx = Int(Double(w) * 0.28)
+    let centerRy = Int(Double(h) * 0.30)
+
+    for start in 0..<(w * h) where !label[start] {
+        let i = start * 4
+        let r0 = Int(pixels[i]), g0 = Int(pixels[i + 1]), b0 = Int(pixels[i + 2])
+        let mn0 = min(r0, min(g0, b0)), mx0 = max(r0, max(g0, b0))
+        guard (mx0 - mn0) <= 30, mn0 >= 200 else { continue }   // 只处理近白块
+        guard pixels[i + 3] > 8 else { continue }
+
+        // BFS 找这个白色连通块
+        var comp = [Int]()
+        var q = [start]
+        label[start] = true
+        var head = 0
+        var sumX = 0, sumY = 0
+        while head < q.count {
+            let p = q[head]; head += 1
+            comp.append(p)
+            let x = p % w, y = p / w
+            sumX += x; sumY += y
+            for (nx, ny) in [(x-1,y),(x+1,y),(x,y-1),(x,y+1)] {
+                if nx < 0 || nx >= w || ny < 0 || ny >= h { continue }
+                let np = ny * w + nx
+                if label[np] { continue }
+                let ni = np * 4
+                if pixels[ni + 3] <= 8 { continue }
+                let nr = Int(pixels[ni]), ng = Int(pixels[ni + 1]), nb = Int(pixels[ni + 2])
+                let nmn = min(nr, min(ng, nb)), nmx = max(nr, max(ng, nb))
+                guard (nmx - nmn) <= 30, nmn >= 200 else { continue }
+                label[np] = true
+                q.append(np)
+            }
+        }
+
+        let area = comp.count
+        guard area <= 400 else { continue }          // 大块（围裙）不动
+        let mx = sumX / area, my = sumY / area
+        let inCenter = abs(mx - cx) < centerRx && abs(my - cy) < centerRy
+        if inCenter { continue }                     // 中心区域（眼睛高光）不动
+        for p in comp { pixels[p * 4 + 3] = 0 }
+        smallRemoved += area
+    }
+    if smallRemoved > 0 { print("  清理外围碎白块 \(smallRemoved) 像素") }
 }
 
 guard let outCG = ctx.makeImage() else {

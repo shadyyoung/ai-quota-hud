@@ -84,13 +84,14 @@ enum CharacterProcessor {
                 }
             }
 
-            // 去白边：迭代腐蚀
-            for _ in 0..<3 {
+            // 去白边：迭代腐蚀，只吃低饱和度的白，保住浅蓝发丝
+            for _ in 0..<30 {
                 var batch = [Int]()
                 for p in 0..<(w * h) where !removed[p] {
                     let i = p * 4
                     let mn = min(Int(px[i]), min(Int(px[i + 1]), Int(px[i + 2])))
-                    guard mn >= 218 else { continue }
+                    let mx = max(Int(px[i]), max(Int(px[i + 1]), Int(px[i + 2])))
+                    guard mn >= 222, mx - mn <= 34 else { continue }
                     let x = p % w, y = p / w
                     var nearHole = false
                     for (nx, ny) in [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)] {
@@ -101,6 +102,48 @@ enum CharacterProcessor {
                 }
                 if batch.isEmpty { break }
                 for p in batch { removed[p] = true }
+            }
+
+            // 清理发丝缝隙里的碎白块：小面积 + 不在中心
+            do {
+                var seen = [Bool](repeating: false, count: w * h)
+                let cx = w / 2, cy = h / 2
+                let rx = Int(Double(w) * 0.28), ry = Int(Double(h) * 0.30)
+                for start in 0..<(w * h) where !seen[start] && !removed[start] {
+                    let i = start * 4
+                    let r0 = Int(px[i]), g0 = Int(px[i + 1]), b0 = Int(px[i + 2])
+                    let mn0 = min(r0, min(g0, b0)), mx0 = max(r0, max(g0, b0))
+                    guard mx0 - mn0 <= 30, mn0 >= 200, px[i + 3] > 8 else { continue }
+
+                    var comp = [Int]()
+                    var queue = [start]
+                    var head = 0
+                    seen[start] = true
+                    var sumX = 0, sumY = 0
+                    while head < queue.count {
+                        let q = queue[head]; head += 1
+                        comp.append(q)
+                        let x = q % w, y = q / w
+                        sumX += x; sumY += y
+                        for (nx, ny) in [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)] {
+                            if nx < 0 || nx >= w || ny < 0 || ny >= h { continue }
+                            let np = ny * w + nx
+                            if seen[np] || removed[np] { continue }
+                            let ni = np * 4
+                            if px[ni + 3] <= 8 { continue }
+                            let nr = Int(px[ni]), ng = Int(px[ni + 1]), nb = Int(px[ni + 2])
+                            let nmn = min(nr, min(ng, nb)), nmx = max(nr, max(ng, nb))
+                            guard nmx - nmn <= 30, nmn >= 200 else { continue }
+                            seen[np] = true
+                            queue.append(np)
+                        }
+                    }
+                    let area = comp.count
+                    guard area <= 400 else { continue }
+                    let mxp = sumX / area, myp = sumY / area
+                    if abs(mxp - cx) < rx && abs(myp - cy) < ry { continue }   // 中心不动（眼睛高光）
+                    for q in comp { removed[q] = true }
+                }
             }
 
             for p in 0..<(w * h) where removed[p] {
