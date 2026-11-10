@@ -18,7 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static let hoverAlpha: CGFloat = 1.0
 
     /// 收起时只剩一条 10pt 高的细条
-    static let collapsedHeight: CGFloat = 10
+    static var collapsedHeight: CGFloat { 10 + HUDContentView.charHeight }
 
     private var window: HUDWindow!
     private var hud: HUDContentView!
@@ -56,8 +56,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let idx = CommandLine.arguments.firstIndex(of: "--dump-window"),
            idx + 1 < CommandLine.arguments.count {
             let outPath = CommandLine.arguments[idx + 1]
+            let wantCompact = CommandLine.arguments.contains("--compact-dump")
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                self?.setExpanded(true)
+                self?.setExpanded(!wantCompact)
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
                 guard let win = self?.window, let view = win.contentView else {
@@ -91,7 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let h = HUDContentView.preferredHeight(for: [])
         let origin: NSPoint
         if let pos = savedPosition() {
-            origin = NSPoint(x: pos.x, y: pos.topY - h)   // 顶部位置稳定，按当前高度反推左下角
+            origin = NSPoint(x: pos.x, y: pos.bottomY)   // 底部（细条）位置稳定
         } else {
             origin = defaultOrigin(height: h)
         }
@@ -245,7 +246,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let old = window.frame
         guard abs(old.height - height) > 0.5 else { return }
         var f = old
-        f.origin.y = old.maxY - height
+        // 底部固定：细条留在原地，角色向上伸展 / 收回
         f.size.height = height
         window.setFrame(f, display: true, animate: false)
         window.contentView?.frame = NSRect(origin: .zero, size: f.size)
@@ -291,7 +292,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 存的是「x 坐标 + 顶部 y」——因为高度会在展开/收起之间变化，
     /// 只有顶部位置是稳定的，这样重启后卡片不会上下漂。
-    private func savedPosition() -> (x: CGFloat, topY: CGFloat)? {
+    private func savedPosition() -> (x: CGFloat, bottomY: CGFloat)? {
         guard let s = UserDefaults.standard.string(forKey: frameKey) else { return nil }
         let parts = s.split(separator: ",").compactMap { Double($0) }
         guard parts.count == 2 else { return nil }
@@ -300,7 +301,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func savePosition() {
         let f = window.frame
-        UserDefaults.standard.set("\(f.origin.x),\(f.maxY)", forKey: frameKey)
+        UserDefaults.standard.set("\(f.origin.x),\(f.origin.y)", forKey: frameKey)
     }
 
     private func defaultOrigin(height: CGFloat) -> NSPoint {

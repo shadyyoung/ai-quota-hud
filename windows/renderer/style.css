@@ -261,7 +261,7 @@ body.collapsed .dots {
 }
 
 body.collapsed #character {
-  display: none;
+  bottom: 10px;          /* 贴在细条上沿 */
 }
 
 body.collapsed #card {

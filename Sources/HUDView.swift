@@ -86,8 +86,13 @@ final class HUDContentView: NSView {
         super.draw(dirtyRect)
 
         if compact {
-            drawGlass(in: bounds, corner: 5)
-            drawCompactDots()
+            // 收起态：角色仍然趴在上面，下面只是变成一条细线
+            let cardRect = NSRect(x: 0, y: Self.charHeight,
+                                  width: bounds.width,
+                                  height: max(1, bounds.height - Self.charHeight))
+            drawCharacter(in: NSRect(x: 0, y: 0, width: bounds.width, height: Self.charHeight))
+            drawGlass(in: cardRect, corner: 5)
+            drawCompactDots(baseY: Self.charHeight)
             return
         }
 
@@ -185,17 +190,19 @@ final class HUDContentView: NSView {
     }
 
     /// 收起态：一排彩色小圆点，一眼看到各服务状态
-    private func drawCompactDots() {
+    private func drawCompactDots(baseY: CGFloat = 0) {
+        let barH = max(1, bounds.height - baseY)
         guard !items.isEmpty else {
             Palette.textTertiary.setFill()
-            NSBezierPath(ovalIn: NSRect(x: bounds.midX - 2, y: bounds.midY - 2, width: 4, height: 4)).fill()
+            NSBezierPath(ovalIn: NSRect(x: bounds.midX - 2, y: baseY + (barH - 4) / 2,
+                                        width: 4, height: 4)).fill()
             return
         }
         let dot: CGFloat = 4
         let gap: CGFloat = 7
         let total = CGFloat(items.count) * dot + CGFloat(items.count - 1) * gap
         var x = (bounds.width - total) / 2
-        let y = (bounds.height - dot) / 2
+        let y = baseY + (barH - dot) / 2
         for item in items {
             let color = item.status == .unavailable ? Palette.textTertiary : Palette.accent(item.accent)
             color.setFill()
