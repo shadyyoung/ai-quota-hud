@@ -42,15 +42,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: 启动
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        loadAvatar()          // 必须在建窗口之前，否则形象还是 nil
         buildWindow()
         scheduleTimer()
         detectProxyIfNeeded()
         registerHotKey()
-        loadAvatar()
         JsonProviderLoader.writeExampleIfNeeded()
         Notifier.requestAuthorization()
         checkForUpdates(silent: true)
         refresh(force: true)
+
+        // 调试：把窗口实际内容渲染成图片（用于验证布局，不依赖屏幕录制权限）
+        if let idx = CommandLine.arguments.firstIndex(of: "--dump-window"),
+           idx + 1 < CommandLine.arguments.count {
+            let outPath = CommandLine.arguments[idx + 1]
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                self?.setExpanded(true)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                guard let win = self?.window, let view = win.contentView else {
+                    print("没有窗口"); exit(1)
+                }
+                win.displayIfNeeded()
+                guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
+                    print("无法创建位图"); exit(1)
+                }
+                view.cacheDisplay(in: view.bounds, to: rep)
+                if let png = rep.representation(using: .png, properties: [:]) {
+                    try? png.write(to: URL(fileURLWithPath: outPath))
+                    print("窗口已渲染: \(outPath) (\(rep.pixelsWide)x\(rep.pixelsHigh))")
+                }
+                exit(0)
+            }
+        }
     }
 
     /// 首次启动没有代理配置时，自动探一个本机可用端口（只改本 app 的配置）
@@ -86,11 +110,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.appearance = NSAppearance(named: .vibrantDark)
         window.ignoresMouseEvents = false
 
-        let effect = NSVisualEffectView(frame: NSRect(origin: .zero, size: frame.size))
+        // 毛玻璃只铺在卡片上；上方角色区保持完全透明
+        let cardHeight = frame.height - HUDContentView.charHeight
+        let effect = NSVisualEffectView(frame: NSRect(x: 0, y: 0,
+                                                      width: frame.width,
+                                                      height: cardHeight))
         effect.material = .hudWindow
         effect.blendingMode = .behindWindow
         effect.state = .active
-        effect.autoresizingMask = [.width, .height]
+        effect.autoresizingMask = [.width, .minYMargin]
         effect.wantsLayer = true
         effect.layer?.cornerRadius = HUDContentView.corner
         effect.layer?.masksToBounds = true
@@ -221,7 +249,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         f.size.height = height
         window.setFrame(f, display: true, animate: false)
         window.contentView?.frame = NSRect(origin: .zero, size: f.size)
-        effectView.frame = NSRect(origin: .zero, size: f.size)
+        // 毛玻璃只铺卡片，角色区保持透明
+        let cardH = max(1, f.size.height - HUDContentView.charHeight)
+        effectView.frame = NSRect(x: 0, y: 0, width: f.size.width, height: cardH)
         hud.frame = NSRect(origin: .zero, size: f.size)
     }
 
@@ -610,6 +640,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func loadAvatar() {
+        let all = avatarPaths()
+
         let saved = UserDefaults.standard.string(forKey: "avatarPath")
 
         // 先试用户上次选的
@@ -637,7 +669,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // 最后用内置
-        let builtin = avatarPaths().first(where: { $0.hasSuffix("default.png") })
+        let builtin = all.first(where: { $0.hasSuffix("default.png") })
         currentAvatarPath = builtin
         currentAvatarImage = builtin.flatMap { NSImage(contentsOfFile: $0) }
     }
