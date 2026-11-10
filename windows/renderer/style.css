@@ -261,12 +261,11 @@ body.collapsed .dots {
 }
 
 body.collapsed #character {
-  bottom: 10px;          /* 贴在细条上沿 */
+  bottom: 0;
 }
 
 body.collapsed #card {
-  height: 10px;
-  border-radius: 5px;
+  display: none;
 }
 
 .dot {

@@ -18,7 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static let hoverAlpha: CGFloat = 1.0
 
     /// 收起时只剩一条 10pt 高的细条
-    static var collapsedHeight: CGFloat { 10 + HUDContentView.charHeight }
+    static var collapsedHeight: CGFloat { HUDContentView.charHeight }
 
     private var window: HUDWindow!
     private var hud: HUDContentView!
@@ -57,10 +57,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
            idx + 1 < CommandLine.arguments.count {
             let outPath = CommandLine.arguments[idx + 1]
             let wantCompact = CommandLine.arguments.contains("--compact-dump")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                self?.setExpanded(!wantCompact)
+            self.trackingEnabled = false     // dump 时别让鼠标追踪改状态
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
+                guard let self, let win = self.window else { return }
+                if wantCompact {
+                    self.hud.compact = true
+                    self.effectView?.isHidden = true
+                    self.resize(to: Self.collapsedHeight)
+                } else {
+                    self.hud.compact = false
+                    self.effectView?.isHidden = false
+                    self.resize(to: max(60, HUDContentView.preferredHeight(for: self.lastItems)))
+                }
+                win.displayIfNeeded()
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.5) { [weak self] in
                 guard let win = self?.window, let view = win.contentView else {
                     print("没有窗口"); exit(1)
                 }
@@ -225,12 +236,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if on {
             hud.isHidden = false
             hud.compact = false
+            effectView.isHidden = false
             effectView.layer?.cornerRadius = HUDContentView.corner
             resize(to: max(60, HUDContentView.preferredHeight(for: lastItems)))
         } else {
             resize(to: Self.collapsedHeight)
-            hud.compact = true          // 收起时画一排小圆点，而不是纯色条
-            effectView.layer?.cornerRadius = 5
+            hud.compact = true          // 收起时只显示角色
+            effectView.isHidden = true
         }
         hud.needsDisplay = true
 

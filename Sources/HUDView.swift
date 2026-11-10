@@ -86,13 +86,8 @@ final class HUDContentView: NSView {
         super.draw(dirtyRect)
 
         if compact {
-            // 收起态：角色仍然趴在上面，下面只是变成一条细线
-            let cardRect = NSRect(x: 0, y: Self.charHeight,
-                                  width: bounds.width,
-                                  height: max(1, bounds.height - Self.charHeight))
-            drawCharacter(in: NSRect(x: 0, y: 0, width: bounds.width, height: Self.charHeight))
-            drawGlass(in: cardRect, corner: 5)
-            drawCompactDots(baseY: Self.charHeight)
+            // 收起态：只剩角色本人，条和背景都不画
+            drawCharacter(in: bounds)
             return
         }
 
