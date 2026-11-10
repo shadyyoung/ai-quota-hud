@@ -10,13 +10,18 @@
  *  - 全局快捷键 Ctrl+Alt+A 展开 5 秒
  */
 
-const { app, BrowserWindow, ipcMain, screen, Tray, Menu, globalShortcut, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Tray, Menu, globalShortcut, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+const WINDOW_WIDTH = 320;
 const CARD_WIDTH = 278;
 const CARD_HEIGHT = 252;
+const CHARACTER_HEIGHT = 139;                       // 角色露出高度
+const OVERLAP = 25;                                 // 角色与卡片的重叠
+const FULL_HEIGHT = CHARACTER_HEIGHT + CARD_HEIGHT - OVERLAP;
 const COLLAPSED_HEIGHT = 10;
+const EXPAND_DELTA = FULL_HEIGHT - COLLAPSED_HEIGHT;
 const IDLE_ALPHA = 0.18;
 const HOVER_ALPHA = 1.0;
 
@@ -59,8 +64,8 @@ function createWindow() {
   const saved = loadSettings();
 
   win = new BrowserWindow({
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
+    width: WINDOW_WIDTH,
+    height: FULL_HEIGHT,
     x: saved.x ?? (sw - CARD_WIDTH - 24),
     y: saved.y ?? 24,
     frame: false,
@@ -115,10 +120,18 @@ function setExpanded(on, force = false) {
   expanded = on;
 
   const [x, y] = win.getPosition();
-  const height = on ? CARD_HEIGHT : COLLAPSED_HEIGHT;
 
-  // 顶部固定：收起时保持 y 不动，只改高度
-  win.setBounds({ x, y, width: CARD_WIDTH, height }, false);
+  // 底部固定：展开时向上长，收起时向下缩
+  let newY = on ? y - EXPAND_DELTA : y + EXPAND_DELTA;
+  const disp = screen.getDisplayNearestPoint({ x, y }).workArea;
+  newY = Math.max(disp.y, Math.min(newY, disp.y + disp.height - (on ? FULL_HEIGHT : COLLAPSED_HEIGHT)));
+
+  win.setBounds({
+    x,
+    y: newY,
+    width: WINDOW_WIDTH,
+    height: on ? FULL_HEIGHT : COLLAPSED_HEIGHT,
+  }, false);
   win.webContents.send('expanded', on);
   win.webContents.send('alpha', on ? HOVER_ALPHA : IDLE_ALPHA);
 }
@@ -306,6 +319,32 @@ function refreshTrayMenu() {
           },
         }));
         items.push({ type: 'separator' });
+        items.push({
+          label: '更换形象照片…',
+          click: async () => {
+            const r = await dialog.showOpenDialog(win, {
+              title: '选择形象图片（建议用透明背景 PNG）',
+              filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }],
+              properties: ['openFile'],
+            });
+            if (r.canceled || !r.filePaths[0]) return;
+            const src = r.filePaths[0];
+            const dir = userAvatarDir();
+            try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
+            const name = 'photo-' + Date.now() + (path.extname(src) || '.png');
+            const dest = path.join(dir, name);
+            try {
+              fs.copyFileSync(src, dest);
+            } catch (e) {
+              console.error('复制图片失败', e.message);
+              return;
+            }
+            saveSettings({ avatar: 'user:' + name });
+            if (win && !win.isDestroyed()) {
+              win.webContents.send('avatar', avatarPayload());
+            }
+          },
+        });
         items.push({
           label: '把新图片放进形象文件夹…',
           click: () => {

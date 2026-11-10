@@ -36,6 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var refreshing = false
     private let frameKey = "hud.frame"
     private var lastItems: [QuotaItem] = []
+    private var currentAvatarImage: NSImage?
+    private var currentAvatarPath: String?
 
     // MARK: 启动
 
@@ -44,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         scheduleTimer()
         detectProxyIfNeeded()
         registerHotKey()
+        loadAvatar()
         JsonProviderLoader.writeExampleIfNeeded()
         Notifier.requestAuthorization()
         checkForUpdates(silent: true)
@@ -105,6 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hud.autoresizingMask = [.width, .height]
         hud.onRightClick = { [weak self] in self?.showMenu() }
         hud.onDoubleClick = { [weak self] in self?.refresh(force: true) }
+        hud.avatarImage = currentAvatarImage
         container.addSubview(hud)
 
         window.alphaValue = Self.hoverAlpha   // 启动先完整展开 3 秒，让人看到位置
@@ -329,6 +333,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         proxyItem.target = self
         menu.addItem(proxyItem)
 
+        // 形象
+        let avatarMenu = NSMenu()
+        for path in avatarPaths() {
+            let name = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
+            let it = NSMenuItem(title: name, action: #selector(doSetAvatar(_:)), keyEquivalent: "")
+            it.target = self
+            it.representedObject = path
+            it.state = (path == currentAvatarPath) ? .on : .off
+            avatarMenu.addItem(it)
+        }
+        avatarMenu.addItem(.separator())
+        let importPhoto = NSMenuItem(title: "更换形象照片…",
+                                     action: #selector(doImportPhoto), keyEquivalent: "")
+        importPhoto.target = self
+        avatarMenu.insertItem(importPhoto, at: 0)
+        avatarMenu.insertItem(.separator(), at: 1)
+
+        let openAvatarDir = NSMenuItem(title: "把新图片放进形象文件夹…",
+                                       action: #selector(doOpenAvatarDir), keyEquivalent: "")
+        openAvatarDir.target = self
+        avatarMenu.addItem(openAvatarDir)
+        let avatarItem = NSMenuItem(title: "形象", action: nil, keyEquivalent: "")
+        avatarItem.submenu = avatarMenu
+        menu.addItem(avatarItem)
+
         let wbItem = NSMenuItem(title: "设置 WorkBuddy 剩余积分…",
                                 action: #selector(doSetWorkBuddyCredits), keyEquivalent: "")
         wbItem.target = self
@@ -549,6 +578,80 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: 形象（头像）
+
+    private var userAvatarDir: URL {
+        QuotaUtil.home.appendingPathComponent(".config/ai-quota-hud/avatars")
+    }
+
+    /// 所有可用形象：内置 + 用户目录
+    private func avatarPaths() -> [String] {
+        var out: [String] = []
+        if let url = Bundle.main.url(forResource: "default", withExtension: "png",
+                                     subdirectory: "avatars") {
+            out.append(url.path)
+        } else if let res = Bundle.main.resourceURL?
+                    .appendingPathComponent("avatars/default.png"),
+                  FileManager.default.fileExists(atPath: res.path) {
+            out.append(res.path)
+        }
+
+        let dir = userAvatarDir
+        if let files = try? FileManager.default.contentsOfDirectory(atPath: dir.path) {
+            for f in files.sorted() {
+                let lower = f.lowercased()
+                if lower.hasSuffix(".png") || lower.hasSuffix(".jpg")
+                    || lower.hasSuffix(".jpeg") || lower.hasSuffix(".gif") {
+                    out.append(dir.appendingPathComponent(f).path)
+                }
+            }
+        }
+        return out
+    }
+
+    private func loadAvatar() {
+        let saved = UserDefaults.standard.string(forKey: "avatarPath")
+
+        // 先试用户上次选的
+        if let saved, let img = NSImage(contentsOfFile: saved) {
+            currentAvatarPath = saved
+            currentAvatarImage = img
+            return
+        }
+
+        // 再试用户目录里的第一张
+        let dir = userAvatarDir
+        if let files = try? FileManager.default.contentsOfDirectory(atPath: dir.path) {
+            for f in files.sorted() {
+                let lower = f.lowercased()
+                if lower.hasSuffix(".png") || lower.hasSuffix(".jpg")
+                    || lower.hasSuffix(".jpeg") || lower.hasSuffix(".gif") {
+                    let p = dir.appendingPathComponent(f).path
+                    if let img = NSImage(contentsOfFile: p) {
+                        currentAvatarPath = p
+                        currentAvatarImage = img
+                        return
+                    }
+                }
+            }
+        }
+
+        // 最后用内置
+        let builtin = avatarPaths().first(where: { $0.hasSuffix("default.png") })
+        currentAvatarPath = builtin
+        currentAvatarImage = builtin.flatMap { NSImage(contentsOfFile: $0) }
+    }
+
+    @objc private func doSetAvatar(_ sender: NSMenuItem) {
+        guard let path = sender.representedObject as? String,
+              let img = NSImage(contentsOfFile: path) else { return }
+        currentAvatarPath = path
+        currentAvatarImage = img
+        UserDefaults.standard.set(path, forKey: "avatarPath")
+        hud.avatarImage = img
+        hud.needsDisplay = true
+    }
+
     // MARK: 设置与更新
 
     private var settingsWC: SettingsWindowController?
@@ -603,6 +706,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         a.addButton(withTitle: "好")
         NSApp.activate(ignoringOtherApps: true)
         a.runModal()
+    }
+
+    /// 选一张照片，自动抠背景后作为形象
+    @objc private func doImportPhoto() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg, .heic, .webP, .gif, .bmp]
+        panel.allowsMultipleSelection = false
+        panel.message = "选一张照片，自动抠掉背景后放到卡片上"
+        panel.prompt = "用这张"
+        guard panel.runModal() == .OK, let url = panel.url,
+              let img = NSImage(contentsOf: url) else { return }
+
+        guard let processed = CharacterProcessor.process(img) else {
+            let alert = NSAlert()
+            alert.messageText = "没法处理这张图"
+            alert.informativeText = "背景太杂或图片太小都可能失败。建议用主体清晰、浅色背景的照片。"
+            alert.runModal()
+            return
+        }
+
+        let dir = userAvatarDir
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let name = "photo-\(Int(Date().timeIntervalSince1970)).png"
+        let dest = dir.appendingPathComponent(name)
+
+        guard let tiff = processed.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else { return }
+        do {
+            try png.write(to: dest)
+        } catch {
+            return
+        }
+
+        currentAvatarPath = dest.path
+        currentAvatarImage = processed
+        UserDefaults.standard.set(dest.path, forKey: "avatarPath")
+        hud.avatarImage = processed
+        hud.needsDisplay = true
+    }
+
+    @objc private func doOpenAvatarDir() {
+        let dir = userAvatarDir
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: dir.path)
     }
 
     // MARK: 开机自启

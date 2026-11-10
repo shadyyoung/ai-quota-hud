@@ -18,3 +18,4 @@ providers.local.json
 windows/node_modules/
 windows/dist/
 windows/*.log
+.cache/

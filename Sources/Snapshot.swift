@@ -16,6 +16,11 @@ enum Snapshot {
 
         let hud = HUDContentView(frame: container.bounds)
         hud.compact = compact
+        // 预览里也带上形象
+        if let url = Bundle.main.url(forResource: "default", withExtension: "png",
+                                     subdirectory: "avatars") {
+            hud.avatarImage = NSImage(contentsOf: url)
+        }
         hud.update(items: items, updatedAt: Date())
         container.layer?.cornerRadius = compact ? 5 : HUDContentView.corner
         container.addSubview(hud)

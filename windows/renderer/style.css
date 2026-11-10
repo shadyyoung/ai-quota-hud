@@ -21,10 +21,37 @@ html, body {
   color: #f2f4f8;
 }
 
+#character {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 227px;              /* 卡片高度 252 - 重叠 25 */
+  z-index: 1;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+#character img {
+  height: 139px;
+  width: auto;
+  display: none;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35));
+}
+
+#character img.loaded {
+  display: block;
+}
+
 #card {
-  position: relative;
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0;
+  width: 278px;
+  height: 252px;
+  z-index: 2;
   border-radius: 20px;
   overflow: hidden;
   opacity: var(--alpha, 1);
@@ -96,33 +123,12 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  height: 44px;
-  margin-bottom: 2px;
+  height: 18px;
+  margin-bottom: 6px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   padding-bottom: 6px;
 }
 
-/* 形象（头像） */
-.avatar {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-  display: none;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1.5px solid rgba(255, 255, 255, 0.24);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.38);
-}
-
-.avatar.loaded {
-  display: block;
-}
-
-header .title {
-  flex: 1;
-}
 
 .title {
   font-size: 11px;
@@ -254,7 +260,12 @@ body.collapsed .dots {
   display: flex;
 }
 
+body.collapsed #character {
+  display: none;
+}
+
 body.collapsed #card {
+  height: 10px;
   border-radius: 5px;
 }
 

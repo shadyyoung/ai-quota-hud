@@ -24,6 +24,7 @@ swiftc -swift-version 5 -O \
   Sources/Providers.swift \
   Sources/Collector.swift \
   Sources/HUDView.swift \
+  Sources/CharacterProcessor.swift \
   Sources/Snapshot.swift \
   Sources/AppDelegate.swift \
   Sources/main.swift \
@@ -36,6 +37,14 @@ build/icongen build/AppIcon.iconset >/dev/null
 iconutil -c icns build/AppIcon.iconset -o build/AppIcon.icns
 cp build/AppIcon.icns "${APP}/Contents/Resources/"
 echo "    ✓ AppIcon.icns"
+
+echo "==> 打包形象资源"
+mkdir -p "${APP}/Contents/Resources/avatars"
+if [ -d "assets/avatars" ]; then
+  cp assets/avatars/*.png "${APP}/Contents/Resources/avatars/" 2>/dev/null || true
+  cp assets/avatars/*.jpg "${APP}/Contents/Resources/avatars/" 2>/dev/null || true
+  ls "${APP}/Contents/Resources/avatars/" | head -5
+fi
 
 echo "==> 写入 Info.plist"
 cat > "${APP}/Contents/Info.plist" <<'PLIST'

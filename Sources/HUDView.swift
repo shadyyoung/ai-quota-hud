@@ -30,15 +30,20 @@ final class HUDContentView: NSView {
     var staleSeconds: TimeInterval = 0
     /// 收起态：只画几个小圆点
     var compact = false
+    /// 形象图片（可为空，空则不占位）
+    var avatarImage: NSImage?
     var onRightClick: (() -> Void)?
     var onDoubleClick: (() -> Void)?
 
     static let cardWidth: CGFloat = 278
+    /// 角色立绘区域高度（宽度按图片比例 675:330 推算）
+    static let charHeight: CGFloat = 139
     static let pad: CGFloat = 16
-    static let headerHeight: CGFloat = 28
+    static let headerHeight: CGFloat = 44
     static let rowBar: CGFloat = 60
     static let rowPlain: CGFloat = 48
     /// Liquid Glass 的圆角比传统卡片更大
+    static let avatarSize: CGFloat = 38
     static let corner: CGFloat = 20
 
     override var isFlipped: Bool { true }
@@ -50,7 +55,7 @@ final class HUDContentView: NSView {
 
     static func preferredHeight(for items: [QuotaItem]) -> CGFloat {
         let rows = items.reduce(0) { $0 + rowHeight(for: $1) }
-        return pad + headerHeight + rows + pad - 6
+        return charHeight + pad + headerHeight + rows + pad - 6
     }
 
     func update(items: [QuotaItem], updatedAt: Date) {
@@ -79,31 +84,61 @@ final class HUDContentView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        drawGlass(corner: compact ? 5 : Self.corner)
 
         if compact {
+            drawGlass(in: bounds, corner: 5)
             drawCompactDots()
             return
         }
 
-        drawHeader()
-        var y = Self.pad + Self.headerHeight
+        // 上方：角色立绘（从卡片背后探出来）
+        let charRect = NSRect(x: 0, y: 0, width: bounds.width, height: Self.charHeight)
+        drawCharacter(in: charRect)
+
+        // 下方：额度卡片
+        let cardRect = NSRect(x: 0, y: Self.charHeight,
+                              width: bounds.width,
+                              height: bounds.height - Self.charHeight)
+        drawGlass(in: cardRect, corner: Self.corner)
+
+        drawHeader(baseY: Self.charHeight)
+        var y = Self.charHeight + Self.pad + Self.headerHeight
         for item in items {
             let h = Self.rowHeight(for: item)
             drawRow(item, y: y, height: h)
             y += h
         }
         if items.isEmpty {
-            drawText("正在读取…", font: .systemFont(ofSize: 11),
+            drawText("正在读取…", font: NSFont.systemFont(ofSize: 11),
                      color: Palette.textTertiary,
-                     at: NSPoint(x: Self.pad, y: Self.pad + Self.headerHeight + 6))
+                     at: NSPoint(x: Self.pad,
+                                 y: Self.charHeight + Self.pad + Self.headerHeight + 6))
         }
+    }
+
+    /// 角色立绘：底部贴着卡片上沿，像是趴在卡片后面
+    private func drawCharacter(in rect: NSRect) {
+        guard let img = avatarImage else { return }
+        let imgAspect = img.size.width / max(img.size.height, 1)
+        var w = rect.width
+        var h = w / imgAspect
+        if h > rect.height {
+            h = rect.height
+            w = h * imgAspect
+        }
+        let x = rect.minX + (rect.width - w) / 2
+        let y = rect.maxY - h
+        let drawRect = NSRect(x: x, y: y, width: w, height: h)
+
+        img.draw(in: drawRect, from: .zero, operation: .sourceOver, fraction: 1.0,
+                 respectFlipped: true,
+                 hints: [.interpolation: NSImageInterpolation.high])
     }
 
     /// Liquid Glass：玻璃本体底色 + 顶部冷光 → 中部透明 → 底部暗角，
     /// 一层渐变覆盖全高避免硬边；再叠内外描边与顶部折射亮边。
-    private func drawGlass(corner: CGFloat) {
-        let r = bounds
+    private func drawGlass(in rect: NSRect, corner: CGFloat) {
+        let r = rect
         guard r.width > 1, r.height > 1 else { return }
         let shape = NSBezierPath(roundedRect: r, xRadius: corner, yRadius: corner)
 
@@ -169,9 +204,10 @@ final class HUDContentView: NSView {
         }
     }
 
-    private func drawHeader() {
+    private func drawHeader(baseY: CGFloat) {
         drawText("AI 额度", font: .systemFont(ofSize: 11, weight: .semibold),
-                 color: Palette.textSecondary, at: NSPoint(x: Self.pad, y: Self.pad - 2))
+                 color: Palette.textSecondary,
+                 at: NSPoint(x: Self.pad, y: baseY + Self.pad + 3))
 
         let fmt = DateFormatter(); fmt.dateFormat = "HH:mm"
         var right = fmt.string(from: updatedAt)
@@ -179,13 +215,7 @@ final class HUDContentView: NSView {
         let font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
         let size = (right as NSString).size(withAttributes: [.font: font])
         drawText(right, font: font, color: Palette.textSecondary.withAlphaComponent(0.7),
-                 at: NSPoint(x: bounds.width - Self.pad - size.width, y: Self.pad))
-
-        Palette.separator.withAlphaComponent(0.5).setFill()
-        NSBezierPath(rect: NSRect(x: Self.pad,
-                                  y: Self.pad + Self.headerHeight - 8,
-                                  width: bounds.width - Self.pad * 2,
-                                  height: 0.5)).fill()
+                 at: NSPoint(x: bounds.width - Self.pad - size.width, y: baseY + Self.pad + 4))
     }
 
     private func drawRow(_ item: QuotaItem, y: CGFloat, height: CGFloat) {
@@ -268,6 +298,20 @@ final class HUDContentView: NSView {
         drawText(sub, font: .systemFont(ofSize: 10, weight: .regular),
                  color: Palette.textSecondary.withAlphaComponent(0.78),
                  at: NSPoint(x: left + 21, y: cursorY))
+    }
+
+    /// 圆形裁剪绘制头像
+    private func drawAvatar(_ img: NSImage, in rect: NSRect) {
+        NSGraphicsContext.saveGraphicsState()
+        NSBezierPath(ovalIn: rect).addClip()
+        img.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1.0,
+                 respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
+        NSGraphicsContext.restoreGraphicsState()
+
+        NSColor(white: 1, alpha: 0.24).setStroke()
+        let border = NSBezierPath(ovalIn: rect.insetBy(dx: 0.75, dy: 0.75))
+        border.lineWidth = 1.5
+        border.stroke()
     }
 
     // MARK: 绘制工具
