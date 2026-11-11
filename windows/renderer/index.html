@@ -8,24 +8,15 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="character"><img id="avatar" alt="" /></div>
-  <div id="card">
-    <div class="glass"></div>
-    <div class="content">
-      <header>
-        <span class="title">AI 额度</span>
-        <span class="time" id="time">--:--</span>
-      </header>
-      <div id="rows">
-        <div class="empty">正在读取…</div>
-      </div>
+  <div id="bubble">
+    <div class="b-title">
+      <span id="b-name">AI 额度</span>
+      <span id="b-pct">--%</span>
     </div>
-    <div class="dots" id="dots">
-      <span class="dot blue"></span>
-      <span class="dot purple"></span>
-      <span class="dot teal"></span>
-    </div>
+    <div class="b-track"><div id="b-fill"></div></div>
+    <div id="b-sub" class="b-sub"></div>
   </div>
+  <div id="character"><img id="avatar" alt="" /></div>
   <script src="renderer.js"></script>
 </body>
 </html>

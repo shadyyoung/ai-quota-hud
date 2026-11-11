@@ -283,3 +283,78 @@ body.collapsed #card {
 
 /* 默认（未指定 accent） */
 .dot.default { background: rgba(255, 255, 255, 0.42); }
+
+
+/* ============ 桌宠形态 ============ */
+
+#bubble {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+  width: 278px;
+  height: 84px;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(18, 18, 22, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  z-index: 3;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease-out;
+}
+
+body.expanded #bubble {
+  opacity: 1;
+}
+
+.b-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+#b-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f2f4f8;
+}
+
+#b-pct {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #4ade80;
+}
+
+.b-track {
+  margin-top: 8px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+
+#b-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 3px;
+  background: #3b82f6;
+  transition: width 0.3s ease-out, background 0.3s;
+}
+
+.b-sub {
+  margin-top: 8px;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 角色在气泡下面 */
+#character {
+  bottom: 0 !important;
+}

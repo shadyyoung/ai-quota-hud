@@ -10,17 +10,17 @@
  *  - 全局快捷键 Ctrl+Alt+A 展开 5 秒
  */
 
-const { app, BrowserWindow, ipcMain, screen, Tray, Menu, globalShortcut, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Tray, Menu, globalShortcut, shell, dialog, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 const WINDOW_WIDTH = 320;
 const CARD_WIDTH = 278;
-const CARD_HEIGHT = 252;
-const CHARACTER_HEIGHT = 139;                       // 角色露出高度
-const OVERLAP = 25;                                 // 角色与卡片的重叠
-const FULL_HEIGHT = CHARACTER_HEIGHT + CARD_HEIGHT - OVERLAP;
-const COLLAPSED_HEIGHT = CHARACTER_HEIGHT;   // 收起时只剩角色
+const CHARACTER_HEIGHT = 139;                       // 角色高度
+const BUBBLE_HEIGHT = 84;                           // 头顶气泡高度
+const FULL_HEIGHT = CHARACTER_HEIGHT + BUBBLE_HEIGHT;
+const COLLAPSED_HEIGHT = CHARACTER_HEIGHT;          // 常态只有角色
 const EXPAND_DELTA = FULL_HEIGHT - COLLAPSED_HEIGHT;
 const IDLE_ALPHA = 0.18;
 const HOVER_ALPHA = 1.0;
@@ -37,6 +37,13 @@ let lastItems = [];
 // ---------------------------------------------------------------- 配置读写
 
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
+
+function notify(title, body) {
+  try {
+    if (!Notification.isSupported()) return;
+    new Notification({ title, body, silent: false }).show();
+  } catch (_) {}
+}
 
 function loadSettings() {
   try {
@@ -142,6 +149,121 @@ function flashCard() {
   flashTimer = setTimeout(() => {
     if (!inside && !expandedByMenu) setExpanded(false);
   }, 5000);
+}
+
+// ---------------------------------------------------------------- 桌宠自动化
+
+let wanderTimer = null;
+let reminderTimer = null;
+let lastFixedReminder = Date.now();
+const firedThresholds = new Set();
+let codexOffsets = {};
+
+function startWandering() {
+  scheduleNextWander();
+}
+
+function scheduleNextWander() {
+  if (wanderTimer) clearTimeout(wanderTimer);
+  const delay = 50000 + Math.random() * 90000;
+  wanderTimer = setTimeout(() => {
+    wanderOnce();
+    scheduleNextWander();
+  }, delay);
+}
+
+function wanderOnce() {
+  if (!win || win.isDestroyed() || expanded) return;
+  const disp = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const [w, h] = win.getSize();
+  const maxX = Math.max(disp.x, disp.x + disp.width - w);
+  const maxY = Math.max(disp.y, disp.y + disp.height - h);
+  const x = Math.round(disp.x + Math.random() * (maxX - disp.x));
+  const y = Math.round(disp.y + Math.random() * (maxY - disp.y));
+  win.setBounds({ x, y, width: w, height: h }, true);
+  saveSettings({ x, y });
+}
+
+function startReminders() {
+  if (reminderTimer) clearInterval(reminderTimer);
+  reminderTimer = setInterval(checkReminders, 120000);
+}
+
+function checkReminders() {
+  if (!loadSettings().notifyEnabled) return;
+  const items = lastItems;
+
+  for (const it of items) {
+    if (it.remaining == null) continue;
+    const pct = Math.round(it.remaining * 100);
+    for (const th of [50, 20, 10]) {
+      if (pct > th) continue;
+      const key = it.id + '_' + th;
+      if (firedThresholds.has(key)) continue;
+      firedThresholds.add(key);
+      notify(it.name + ' 额度偏低', '剩余 ' + pct + '%' + (it.secondary ? ' · ' + it.secondary : ''));
+      flashCard();
+    }
+    if (pct > 60) {
+      for (const k of [...firedThresholds]) if (k.startsWith(it.id + '_')) firedThresholds.delete(k);
+    }
+  }
+
+  const intervalMs = Math.max(15, loadSettings().reminderMinutes || 60) * 60000;
+  if (Date.now() - lastFixedReminder < intervalMs) return;
+  lastFixedReminder = Date.now();
+  const worst = items.filter((x) => x.remaining != null)
+    .sort((a, b) => a.remaining - b.remaining)[0];
+  if (worst) {
+    notify('额度快照', worst.name + ' 剩余 ' + Math.round(worst.remaining * 100) + '%'
+      + (worst.secondary ? ' · ' + worst.secondary : ''));
+    flashCard();
+  }
+}
+
+// 监听 Codex 的 task_complete
+function startCodexWatcher() {
+  const fsx = require('fs');
+  const pathx = require('path');
+  const base = pathx.join(os.homedir(), '.codex', 'sessions');
+  if (!fsx.existsSync(base)) return;
+
+  const scan = () => {
+    try {
+      const files = [];
+      const walk = (dir) => {
+        for (const f of fsx.readdirSync(dir, { withFileTypes: true })) {
+          const full = pathx.join(dir, f.name);
+          if (f.isDirectory()) walk(full);
+          else if (f.name.endsWith('.jsonl')) files.push(full);
+        }
+      };
+      walk(base);
+      files.sort((a, b) => fsx.statSync(b).mtimeMs - fsx.statSync(a).mtimeMs);
+      for (const f of files.slice(0, 6)) {
+        const size = fsx.statSync(f).size;
+        const prev = codexOffsets[f] ?? size;   // 新文件从末尾起
+        if (size <= prev) continue;
+        const fd = fsx.openSync(f, 'r');
+        const buf = Buffer.alloc(size - prev);
+        fsx.readSync(fd, buf, 0, buf.length, prev);
+        fsx.closeSync(fd);
+        codexOffsets[f] = size;
+        const text = buf.toString('utf8');
+        for (const line of text.split('\n')) {
+          if (!line.includes('task_complete')) continue;
+          try {
+            const obj = JSON.parse(line);
+            if (obj?.payload?.type === 'task_complete') {
+              notify('Codex 完成', '任务跑完了');
+              flashCard();
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+  };
+  setInterval(scan, 5000);
 }
 
 // ---------------------------------------------------------------- 鼠标穿透轮询
@@ -433,6 +555,9 @@ if (!gotLock) {
     buildTray();
     scheduleRefresh();
     refresh();
+    startWandering();
+    startReminders();
+    startCodexWatcher();
 
     // 窗口准备好后推头像
     if (win) {
