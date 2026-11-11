@@ -16,6 +16,11 @@ enum Snapshot {
 
         let hud = HUDContentView(frame: container.bounds)
         hud.compact = compact
+        if let idx = CommandLine.arguments.firstIndex(of: "--phase"),
+           idx + 1 < CommandLine.arguments.count,
+           let v = Double(CommandLine.arguments[idx + 1]) {
+            hud.animPhase = CGFloat(v)
+        }
         // 预览里也带上形象
         if let url = Bundle.main.url(forResource: "default", withExtension: "png",
                                      subdirectory: "avatars") {

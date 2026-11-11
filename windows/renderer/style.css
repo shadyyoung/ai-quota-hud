@@ -358,3 +358,18 @@ body.expanded #bubble {
 #character {
   bottom: 0 !important;
 }
+
+/* 呼吸动画：上下浮动 + 轻微缩放，悬停时更明显 */
+@keyframes breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-7px) scale(1.015); }
+}
+
+#character img.loaded {
+  animation: breathe 4.2s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+body.expanded #character img.loaded {
+  animation-duration: 2.8s;
+}

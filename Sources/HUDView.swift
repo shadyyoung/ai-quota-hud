@@ -36,6 +36,10 @@ final class HUDContentView: NSView {
     var highlighted: QuotaItem?
     /// 气泡副标题，比如「Codex 正在前台」
     var contextText: String?
+    /// 呼吸动画的相位（0...2π 循环）
+    var animPhase: CGFloat = 0
+    /// 是否处于悬停态（悬停时呼吸更快更明显）
+    var hovering: Bool = false
     var onRightClick: (() -> Void)?
     var onDoubleClick: (() -> Void)?
 
@@ -170,16 +174,24 @@ final class HUDContentView: NSView {
     /// 角色立绘：底部贴着卡片上沿，像是趴在卡片后面
     private func drawCharacter(in rect: NSRect) {
         guard let img = avatarImage else { return }
+        // 上下留出呼吸浮动的余量，否则角色一动就被窗口边缘裁掉
+        let floatMargin: CGFloat = 10
+        let inner = rect.insetBy(dx: 0, dy: floatMargin)
         let imgAspect = img.size.width / max(img.size.height, 1)
-        var w = rect.width
+        var w = inner.width
         var h = w / imgAspect
-        if h > rect.height {
-            h = rect.height
+        if h > inner.height {
+            h = inner.height
             w = h * imgAspect
         }
-        let x = rect.minX + (rect.width - w) / 2
-        let y = rect.maxY - h
-        let drawRect = NSRect(x: x, y: y, width: w, height: h)
+        let x = inner.minX + (inner.width - w) / 2
+        let y = inner.maxY - h
+        var drawRect = NSRect(x: x, y: y, width: w, height: h)
+
+        // 呼吸：整体上下浮动（脚不动），悬停时更明显
+        let amp: CGFloat = hovering ? 1.0 : 0.65
+        let dy = sin(animPhase) * 7.0 * amp   // ±7px / 平时 ±4.5px
+        drawRect.origin.y += dy
 
         img.draw(in: drawRect, from: .zero, operation: .sourceOver, fraction: 1.0,
                  respectFlipped: true,

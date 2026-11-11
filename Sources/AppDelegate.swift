@@ -39,6 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var aiDetectTimer: Timer?
     private var wanderTimer: Timer?
     private var wanderTween: Timer?   // 逐帧移动用的定时器
+    private var animTimer: Timer?     // 呼吸动画
+    private var animPhase: CGFloat = 0
     private var reminderTimer: Timer?
     private var taskWatcher: CodexTaskWatcher?
     private var lastFixedReminder = Date()
@@ -62,6 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startWandering()
         startReminders()
         startCodexWatcher()
+        startBreathing()
 
         // 调试：把窗口实际内容渲染成图片（用于验证布局，不依赖屏幕录制权限）
         if let idx = CommandLine.arguments.firstIndex(of: "--dump-window"),
@@ -629,6 +632,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 window.animator().alphaValue = Self.idleAlpha
             }
         }
+    }
+
+    // MARK: 呼吸动画
+
+    /// 30fps 更新相位，角色轻微上下浮动 + 缩放，像在呼吸
+    private func startBreathing() {
+        animTimer?.invalidate()
+        animTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            // 悬停时呼吸快一点（周期 2.8s），平时慢一点（4.2s）
+            self.animPhase += self.expanded ? 0.075 : 0.05
+            if self.animPhase > .pi * 2 { self.animPhase -= .pi * 2 }
+            self.hud.animPhase = self.animPhase
+            self.hud.hovering = self.expanded
+            self.hud.needsDisplay = true
+        }
+        if let t = animTimer { RunLoop.main.add(t, forMode: .common) }
     }
 
     // MARK: 桌宠自动化
