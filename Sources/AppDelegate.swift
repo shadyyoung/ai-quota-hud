@@ -38,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastItems: [QuotaItem] = []
     private var aiDetectTimer: Timer?
     private var wanderTimer: Timer?
+    private var wanderTween: Timer?   // 逐帧移动用的定时器
     private var reminderTimer: Timer?
     private var taskWatcher: CodexTaskWatcher?
     private var lastFixedReminder = Date()
@@ -668,7 +669,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func scheduleNextWander() {
         wanderTimer?.invalidate()
-        let delay = Double.random(in: 50...140)
+        var delay = Double.random(in: 50...140)
+        if let override = ProcessInfo.processInfo.environment["HUD_WANDER_DELAY"],
+           let v = Double(override), v > 0 {
+            delay = v
+        }
+        NSLog("[wander] 下次移动 %.1f 秒后", delay)
         wanderTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
             self?.wanderOnce()
             self?.scheduleNextWander()
@@ -677,21 +683,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func wanderOnce() {
-        guard let win = window, !expanded else { return }
+        guard let win = window else { NSLog("[wander] 没有窗口"); return }
+        if expanded { NSLog("[wander] 跳过：窗口处于展开态"); return }
+        if wanderTween != nil { NSLog("[wander] 跳过：上一个移动还没走完"); return }
+
         let screen = NSScreen.main?.visibleFrame ?? .zero
         let w = win.frame.width, h = win.frame.height
-        guard screen.width > w, screen.height > h else { return }
-        let x = CGFloat.random(in: screen.minX...(screen.maxX - w))
-        let y = CGFloat.random(in: screen.minY...(screen.maxY - h))
+        guard screen.width > w, screen.height > h else {
+            NSLog("[wander] 跳过：屏幕 %.0fx%.0f 放不下窗口 %.0fx%.0f", screen.width, screen.height, w, h)
+            return
+        }
+        let from = win.frame.origin
+        let to = NSPoint(x: CGFloat.random(in: screen.minX...(screen.maxX - w)),
+                         y: CGFloat.random(in: screen.minY...(screen.maxY - h)))
+        NSLog("[wander] 从 (%.0f,%.0f) 移到 (%.0f,%.0f)", from.x, from.y, to.x, to.y)
 
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 1.6
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            win.animator().setFrameOrigin(NSPoint(x: x, y: y))
+        // 自己插值：animator() 在 borderless NSPanel 上不可靠
+        let duration: TimeInterval = 2.2
+        let steps = Int(duration * 60)
+        var step = 0
+        let timer = Timer(timeInterval: duration / Double(steps), repeats: true) { [weak self] t in
+            guard let self, let win = self.window else { t.invalidate(); self?.wanderTween = nil; return }
+            step += 1
+            let p = min(1.0, Double(step) / Double(steps))
+            // easeInOut
+            let e = p < 0.5 ? 2 * p * p : 1 - pow(-2 * p + 2, 2) / 2
+            let x = from.x + (to.x - from.x) * CGFloat(e)
+            let y = from.y + (to.y - from.y) * CGFloat(e)
+            win.setFrameOrigin(NSPoint(x: x, y: y))
+            if step >= steps {
+                t.invalidate()
+                self.wanderTween = nil
+                self.savePosition()
+            }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.7) { [weak self] in
-            self?.savePosition()
-        }
+        wanderTween = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     /// 周期提醒：固定间隔 + 额度阈值
