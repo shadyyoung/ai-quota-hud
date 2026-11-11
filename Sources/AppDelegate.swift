@@ -58,7 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let outPath = CommandLine.arguments[idx + 1]
             let wantCompact = CommandLine.arguments.contains("--compact-dump")
             self.trackingEnabled = false     // dump 时别让鼠标追踪改状态
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 9.0) { [weak self] in
                 guard let self, let win = self.window else { return }
                 if wantCompact {
                     self.hud.compact = true
@@ -71,7 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 win.displayIfNeeded()
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4.5) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 9.5) { [weak self] in
                 guard let win = self?.window, let view = win.contentView else {
                     print("没有窗口"); exit(1)
                 }
