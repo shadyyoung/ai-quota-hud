@@ -36,6 +36,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var refreshing = false
     private let frameKey = "hud.frame"
     private var lastItems: [QuotaItem] = []
+    private var aiDetectTimer: Timer?
+    private var wanderTimer: Timer?
+    private var reminderTimer: Timer?
+    private var taskWatcher: CodexTaskWatcher?
+    private var lastFixedReminder = Date()
+    private var firedThresholds = Set<String>()
     private var currentAvatarImage: NSImage?
     private var currentAvatarPath: String?
 
@@ -51,6 +57,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Notifier.requestAuthorization()
         checkForUpdates(silent: true)
         refresh(force: true)
+        startAIWatcher()
+        startWandering()
+        startReminders()
+        startCodexWatcher()
 
         // 调试：把窗口实际内容渲染成图片（用于验证布局，不依赖屏幕录制权限）
         if let idx = CommandLine.arguments.firstIndex(of: "--dump-window"),
@@ -139,6 +149,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             layer.borderWidth = 0.5
             layer.borderColor = NSColor(white: 1, alpha: 0.14).cgColor
         }
+        effect.isHidden = true
         effectView = effect
 
         let container = NSView(frame: NSRect(origin: .zero, size: frame.size))
@@ -237,8 +248,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if on {
             hud.isHidden = false
             hud.compact = false
-            effectView.isHidden = false
-            effectView.layer?.cornerRadius = HUDContentView.corner
             resize(to: max(60, HUDContentView.preferredHeight(for: lastItems)))
         } else {
             resize(to: Self.collapsedHeight)
@@ -263,9 +272,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         f.size.height = height
         window.setFrame(f, display: true, animate: false)
         window.contentView?.frame = NSRect(origin: .zero, size: f.size)
-        // 毛玻璃只铺卡片，角色区保持透明
-        let cardH = max(1, f.size.height - HUDContentView.charHeight)
-        effectView.frame = NSRect(x: 0, y: 0, width: f.size.width, height: cardH)
+        // 气泡自己画底色，毛玻璃层彻底不用了
+        effectView.isHidden = true
         hud.frame = NSRect(origin: .zero, size: f.size)
     }
 
@@ -620,6 +628,126 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 window.animator().alphaValue = Self.idleAlpha
             }
         }
+    }
+
+    // MARK: 桌宠自动化
+
+    /// 每 3 秒看一眼前台是哪个 AI，气泡跟着切换
+    private func startAIWatcher() {
+        aiDetectTimer?.invalidate()
+        aiDetectTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
+            self?.refreshHighlight()
+        }
+        if let t = aiDetectTimer { RunLoop.main.add(t, forMode: .common) }
+        refreshHighlight()
+    }
+
+    private func refreshHighlight() {
+        let providerId = AIDetector.currentProviderId()
+        let appName = AIDetector.currentAppName()
+
+        // 前台是 AI → 显示它；否则显示额度最低的那个
+        let target: QuotaItem?
+        if let pid = providerId, let hit = lastItems.first(where: { $0.id == pid }) {
+            target = hit
+        } else {
+            target = lastItems
+                .filter { $0.remaining != nil }
+                .min { ($0.remaining ?? 1) < ($1.remaining ?? 1) } ?? lastItems.first
+        }
+        hud.highlighted = target
+        hud.contextText = appName.map { "\($0) 在前台" }
+        hud.needsDisplay = true
+    }
+
+    /// 角色自己在桌面上溜达（只在没悬停时走）
+    private func startWandering() {
+        wanderTimer?.invalidate()
+        scheduleNextWander()
+    }
+
+    private func scheduleNextWander() {
+        wanderTimer?.invalidate()
+        let delay = Double.random(in: 50...140)
+        wanderTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+            self?.wanderOnce()
+            self?.scheduleNextWander()
+        }
+        if let t = wanderTimer { RunLoop.main.add(t, forMode: .common) }
+    }
+
+    private func wanderOnce() {
+        guard let win = window, !expanded else { return }
+        let screen = NSScreen.main?.visibleFrame ?? .zero
+        let w = win.frame.width, h = win.frame.height
+        guard screen.width > w, screen.height > h else { return }
+        let x = CGFloat.random(in: screen.minX...(screen.maxX - w))
+        let y = CGFloat.random(in: screen.minY...(screen.maxY - h))
+
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 1.6
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            win.animator().setFrameOrigin(NSPoint(x: x, y: y))
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.7) { [weak self] in
+            self?.savePosition()
+        }
+    }
+
+    /// 周期提醒：固定间隔 + 额度阈值
+    private func startReminders() {
+        reminderTimer?.invalidate()
+        reminderTimer = Timer.scheduledTimer(withTimeInterval: 120, repeats: true) { [weak self] _ in
+            self?.checkReminders()
+        }
+        if let t = reminderTimer { RunLoop.main.add(t, forMode: .common) }
+    }
+
+    private func checkReminders() {
+        guard AppSettings.notifyEnabled else { return }
+
+        // 阈值提醒（50 / 20 / 10，各只报一次）
+        for item in lastItems {
+            guard let r = item.remaining else { continue }
+            let pct = Int((r * 100).rounded())
+            for threshold in [50, 20, 10] where pct <= threshold {
+                let key = "\(item.id)_\(threshold)"
+                if firedThresholds.contains(key) { continue }
+                firedThresholds.insert(key)
+                Notifier.post(title: "\(item.name) 额度偏低",
+                              body: "剩余 \(pct)%\(item.secondary.isEmpty ? "" : "· \(item.secondary)")")
+                flashCard()
+            }
+            // 额度回升（重置）后允许再次提醒
+            if pct > 60 {
+                firedThresholds = firedThresholds.filter { !$0.hasPrefix("\(item.id)_") }
+            }
+        }
+
+        // 固定间隔提醒
+        let interval = TimeInterval(max(15, AppSettings.reminderMinutes)) * 60
+        guard Date().timeIntervalSince(lastFixedReminder) >= interval else { return }
+        lastFixedReminder = Date()
+        if let worst = lastItems.filter({ $0.remaining != nil }).min(by: { ($0.remaining ?? 1) < ($1.remaining ?? 1) }) {
+            let pct = Int(((worst.remaining ?? 0) * 100).rounded())
+            Notifier.post(title: "额度快照",
+                          body: "\(worst.name) 剩余 \(pct)%\(worst.secondary.isEmpty ? "" : "· \(worst.secondary)")")
+            flashCard()
+        }
+    }
+
+    /// 监听 Codex 的 task_complete
+    private func startCodexWatcher() {
+        let w = CodexTaskWatcher()
+        w.onTaskComplete = { [weak self] duration in
+            guard let self else { return }
+            var body = "任务跑完了"
+            if let d = duration, d > 1 { body = String(format: "任务跑完了，用时 %.0f 秒", d) }
+            Notifier.post(title: "Codex 完成", body: body)
+            self.flashCard()
+        }
+        w.start()
+        taskWatcher = w
     }
 
     // MARK: 形象（头像）

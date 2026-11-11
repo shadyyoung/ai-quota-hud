@@ -12,6 +12,20 @@ enum Notifier {
         }
     }
 
+    /// 通用通知（桌宠的周期提醒 / 任务完成提醒走这里）
+    static func post(title: String, body: String) {
+        guard AppSettings.notifyEnabled else { return }
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        let req = UNNotificationRequest(identifier: "hud-\(UUID().uuidString)",
+                                        content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(req) { err in
+            if let err { NSLog("AIQuotaHUD 通知失败: \(err.localizedDescription)") }
+        }
+    }
+
     static func checkLowQuota(_ items: [QuotaItem]) {
         guard AppSettings.notifyEnabled else { return }
         let threshold = AppSettings.lowThreshold

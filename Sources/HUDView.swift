@@ -32,12 +32,18 @@ final class HUDContentView: NSView {
     var compact = false
     /// 形象图片（可为空，空则不占位）
     var avatarImage: NSImage?
+    /// 气泡里显示的那一条（当前前台 AI 的额度）
+    var highlighted: QuotaItem?
+    /// 气泡副标题，比如「Codex 正在前台」
+    var contextText: String?
     var onRightClick: (() -> Void)?
     var onDoubleClick: (() -> Void)?
 
     static let cardWidth: CGFloat = 278
     /// 角色立绘区域高度（宽度按图片比例 675:330 推算）
     static let charHeight: CGFloat = 139
+    /// 气泡高度（悬停时从角色头顶冒出）
+    static let bubbleHeight: CGFloat = 84
     static let pad: CGFloat = 16
     static let headerHeight: CGFloat = 44
     static let rowBar: CGFloat = 60
@@ -53,9 +59,9 @@ final class HUDContentView: NSView {
         item.remaining != nil ? rowBar : rowPlain
     }
 
+    /// 悬停态高度：角色 + 头顶气泡
     static func preferredHeight(for items: [QuotaItem]) -> CGFloat {
-        let rows = items.reduce(0) { $0 + rowHeight(for: $1) }
-        return charHeight + pad + headerHeight + rows + pad - 6
+        charHeight + bubbleHeight
     }
 
     func update(items: [QuotaItem], updatedAt: Date) {
@@ -85,34 +91,79 @@ final class HUDContentView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
 
+        // 常态：只有角色本身
         if compact {
-            // 收起态：只剩角色本人，条和背景都不画
             drawCharacter(in: bounds)
             return
         }
 
-        // 上方：角色立绘（从卡片背后探出来）
-        let charRect = NSRect(x: 0, y: 0, width: bounds.width, height: Self.charHeight)
-        drawCharacter(in: charRect)
+        // 悬停：上面气泡 + 下面角色
+        let bubbleRect = NSRect(x: 0, y: 0, width: bounds.width, height: Self.bubbleHeight)
+        drawBubble(in: bubbleRect)
 
-        // 下方：额度卡片
-        let cardRect = NSRect(x: 0, y: Self.charHeight,
+        let charRect = NSRect(x: 0, y: Self.bubbleHeight,
                               width: bounds.width,
-                              height: bounds.height - Self.charHeight)
-        drawGlass(in: cardRect, corner: Self.corner)
+                              height: max(1, bounds.height - Self.bubbleHeight))
+        drawCharacter(in: charRect)
+    }
 
-        drawHeader(baseY: Self.charHeight)
-        var y = Self.charHeight + Self.pad + Self.headerHeight
-        for item in items {
-            let h = Self.rowHeight(for: item)
-            drawRow(item, y: y, height: h)
-            y += h
+    /// 角色头顶的额度气泡
+    private func drawBubble(in rect: NSRect) {
+        let card = NSBezierPath(roundedRect: rect.insetBy(dx: 4, dy: 4),
+                                xRadius: 14, yRadius: 14)
+        NSColor(white: 0.11, alpha: 0.92).setFill()
+        card.fill()
+        NSColor(white: 1, alpha: 0.16).setStroke()
+        card.lineWidth = 1
+        card.stroke()
+
+        let item = highlighted
+        let pad: CGFloat = 14
+
+        // 第一行：AI 名称 + 右上角剩余百分比
+        let title = item?.name ?? "AI 额度"
+        drawText(title, font: NSFont.systemFont(ofSize: 14, weight: .semibold),
+                 color: .white, at: NSPoint(x: rect.minX + pad, y: rect.minY + 14))
+
+        if let remaining = item?.remaining {
+            let pct = "\(Int((remaining * 100).rounded()))%"
+            let font = NSFont.monospacedDigitSystemFont(ofSize: 18, weight: .bold)
+            let size = (pct as NSString).size(withAttributes: [.font: font])
+            let color = remaining < 0.2 ? NSColor.systemRed
+                : (remaining < 0.5 ? NSColor.systemOrange : NSColor.systemGreen)
+            drawText(pct, font: font, color: color,
+                     at: NSPoint(x: rect.maxX - pad - size.width, y: rect.minY + 12))
+        } else if let primary = item?.primary {
+            let font = NSFont.monospacedDigitSystemFont(ofSize: 14, weight: .semibold)
+            let size = (primary as NSString).size(withAttributes: [.font: font])
+            drawText(primary, font: font, color: .white,
+                     at: NSPoint(x: rect.maxX - pad - size.width, y: rect.minY + 15))
         }
-        if items.isEmpty {
-            drawText("正在读取…", font: NSFont.systemFont(ofSize: 11),
-                     color: Palette.textTertiary,
-                     at: NSPoint(x: Self.pad,
-                                 y: Self.charHeight + Self.pad + Self.headerHeight + 6))
+
+        // 第二行：进度条（有比例才画）
+        var lineY = rect.minY + 40
+        if let remaining = item?.remaining {
+            let barRect = NSRect(x: rect.minX + pad, y: lineY,
+                                 width: rect.width - pad * 2, height: 6)
+            NSColor(white: 1, alpha: 0.14).setFill()
+            NSBezierPath(roundedRect: barRect, xRadius: 3, yRadius: 3).fill()
+            let fillW = max(2, barRect.width * CGFloat(remaining))
+            let color = remaining < 0.2 ? NSColor.systemRed
+                : (remaining < 0.5 ? NSColor.systemOrange : NSColor.systemBlue)
+            color.setFill()
+            NSBezierPath(roundedRect: NSRect(x: barRect.minX, y: barRect.minY,
+                                             width: fillW, height: 6),
+                         xRadius: 3, yRadius: 3).fill()
+            lineY += 14
+        }
+
+        // 第三行：副标题（重置时间 / 上下文）
+        var sub = item?.secondary ?? ""
+        if let ctx = contextText, !ctx.isEmpty { sub = sub.isEmpty ? ctx : "\(sub) · \(ctx)" }
+        if !sub.isEmpty {
+            drawText(sub, font: NSFont.systemFont(ofSize: 10.5),
+                     color: NSColor(white: 1, alpha: 0.55),
+                     at: NSPoint(x: rect.minX + pad, y: lineY))
         }
     }
 

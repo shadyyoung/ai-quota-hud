@@ -17,6 +17,12 @@ enum AppSettings {
     }
 
     /// 是否启用系统通知
+    /// 固定间隔提醒（分钟）
+    static var reminderMinutes: Int {
+        get { let v = UserDefaults.standard.integer(forKey: "reminderMinutes"); return v > 0 ? v : 60 }
+        set { UserDefaults.standard.set(newValue, forKey: "reminderMinutes") }
+    }
+
     static var notifyEnabled: Bool {
         get { d.object(forKey: "notifyEnabled") as? Bool ?? true }
         set { d.set(newValue, forKey: "notifyEnabled") }

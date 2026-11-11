@@ -25,6 +25,8 @@ swiftc -swift-version 5 -O \
   Sources/Collector.swift \
   Sources/HUDView.swift \
   Sources/CharacterProcessor.swift \
+  Sources/CodexTaskWatcher.swift \
+  Sources/AIDetector.swift \
   Sources/Snapshot.swift \
   Sources/AppDelegate.swift \
   Sources/main.swift \
