@@ -43,9 +43,9 @@ final class HUDContentView: NSView {
     var onRightClick: (() -> Void)?
     var onDoubleClick: (() -> Void)?
 
-    static let cardWidth: CGFloat = 278
+    static var cardWidth: CGFloat { LayoutConfig.cardWidth }
     /// 角色立绘区域高度（宽度按图片比例 675:330 推算）
-    static let charHeight: CGFloat = 139
+    static var charHeight: CGFloat { LayoutConfig.charHeight }
     /// 气泡高度（悬停时从角色头顶冒出）
     static let bubbleHeight: CGFloat = 84
     static let pad: CGFloat = 16
@@ -175,7 +175,7 @@ final class HUDContentView: NSView {
     private func drawCharacter(in rect: NSRect) {
         guard let img = avatarImage else { return }
         // 上下留出呼吸浮动的余量，否则角色一动就被窗口边缘裁掉
-        let floatMargin: CGFloat = 10
+        let floatMargin: CGFloat = 12
         let inner = rect.insetBy(dx: 0, dy: floatMargin)
         let imgAspect = img.size.width / max(img.size.height, 1)
         var w = inner.width

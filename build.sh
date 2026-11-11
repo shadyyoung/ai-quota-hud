@@ -23,6 +23,7 @@ swiftc -swift-version 5 -O \
   Sources/Calibration.swift \
   Sources/Providers.swift \
   Sources/Collector.swift \
+  Sources/LayoutConfig.swift \
   Sources/HUDView.swift \
   Sources/CharacterProcessor.swift \
   Sources/CodexTaskWatcher.swift \
