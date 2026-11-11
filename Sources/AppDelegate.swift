@@ -116,7 +116,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.isOpaque = false
         window.backgroundColor = .clear
         window.level = .floating
-        window.hasShadow = true
+        // 透明无边框窗口 + 阴影会在角色上方画出一条硬边，关掉
+        window.hasShadow = false
         window.isMovableByWindowBackground = true
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         window.appearance = NSAppearance(named: .vibrantDark)

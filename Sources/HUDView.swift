@@ -178,7 +178,8 @@ final class HUDContentView: NSView {
         // 顶部折射亮边
         if r.height > 14 {
             let inset = corner * 0.65
-            let line = NSRect(x: inset, y: 1, width: r.width - inset * 2, height: 0.9)
+            let line = NSRect(x: r.minX + inset, y: r.minY + 1,
+                              width: r.width - inset * 2, height: 0.9)
             NSColor(white: 1, alpha: 0.46).setFill()
             NSBezierPath(roundedRect: line, xRadius: 0.45, yRadius: 0.45).fill()
         }
